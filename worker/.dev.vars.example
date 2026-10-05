@@ -1,5 +1,7 @@
 # Skopiuj do worker/.dev.vars (plik jest w .gitignore) i uzupełnij.
 GEMINI_API_KEY=
+# Lokalnie dopuszczamy serwer deweloperski i podgląd Vite (w produkcji tylko GitHub Pages).
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:4173
 # Alternatywnie dostawca zgodny z OpenAI (np. Groq):
 # LLM_PROVIDER=openai
 # OPENAI_API_KEY=

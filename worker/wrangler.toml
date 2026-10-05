@@ -7,7 +7,8 @@ compatibility_date = "2026-09-01"
 LLM_PROVIDER = "gemini"
 GEMINI_MODEL = "gemini-2.5-flash"
 # Origin GitHub Pages to sama domena, bez ścieżki repozytorium.
-ALLOWED_ORIGINS = "https://aeternifrigus.github.io,http://localhost:5173,http://localhost:4173"
+# Localhost NIE jest dopuszczony w produkcji; lokalnie nadpisuje to worker/.dev.vars.
+ALLOWED_ORIGINS = "https://aeternifrigus.github.io"
 
 # Limit żądań współdzielony między instancjami workera (10 analiz / 60 s na adres IP).
 [[ratelimits]]

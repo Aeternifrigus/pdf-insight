@@ -9,9 +9,11 @@ on:
 permissions:
   contents: read
 
+# Wdrożenia na main nie są przerywane w połowie (zalecenie GitHub Pages);
+# przerywane są tylko nieaktualne przebiegi dla pull requestów.
 concurrency:
   group: pages-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
