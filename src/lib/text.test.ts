@@ -47,6 +47,17 @@ describe('joinTextItems', () => {
     expect(joinTextItems(items)).toBe('wcześniejsze');
   });
 
+  it('skleja polskie znaki także na stronie obróconej o 90°', () => {
+    const rotated = (str: string, y: number, width: number): TextItemLike => ({
+      str,
+      transform: [0, 10, -10, 0, 100, y],
+      width,
+      hasEOL: false,
+    });
+    const items = [rotated('wcze', 0, 20), rotated('ś', 20.1, 5), rotated('niejsze', 25.1, 30)];
+    expect(joinTextItems(items)).toBe('wcześniejsze');
+  });
+
   it('wstawia spację przy faktycznej przerwie i nową linię przy zmianie wiersza', () => {
     const items = [item('Ala', 0, 15), item('ma', 20, 10), item('kota', 0, 20, 80)];
     expect(joinTextItems(items)).toBe('Ala ma\nkota');

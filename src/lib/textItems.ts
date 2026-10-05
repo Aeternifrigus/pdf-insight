@@ -14,34 +14,37 @@ export interface TextItemLike {
  */
 export function joinTextItems(items: TextItemLike[]): string {
   let out = '';
-  let prevEndX: number | null = null;
-  let prevY: number | null = null;
+  // Koniec poprzedniego elementu i kierunek linii bazowej (obsługa stron obróconych).
+  let prev: { x: number; y: number; dx: number; dy: number } | null = null;
 
   for (const item of items) {
-    const x = item.transform[4] ?? 0;
-    const y = item.transform[5] ?? 0;
-    const size = Math.hypot(item.transform[2] ?? 0, item.transform[3] ?? 0) || 10;
+    const [a = 1, b = 0, c = 0, d = 1, x = 0, y = 0] = item.transform;
+    const size = Math.hypot(c, d) || 10;
+    const len = Math.hypot(a, b) || 1;
+    const dx = a / len;
+    const dy = b / len;
 
-    if (prevEndX !== null && prevY !== null && item.str.length > 0) {
-      const sameLine = Math.abs(y - prevY) < size * 0.5;
-      if (!sameLine) {
+    if (prev && item.str.length > 0) {
+      const vx = x - prev.x;
+      const vy = y - prev.y;
+      // Odległość wzdłuż linii (odstęp między słowami) i w poprzek (zmiana wiersza).
+      const along = vx * prev.dx + vy * prev.dy;
+      const across = Math.abs(-vx * prev.dy + vy * prev.dx);
+      const sameDirection = Math.abs(dx - prev.dx) < 0.01 && Math.abs(dy - prev.dy) < 0.01;
+      if (!sameDirection || across > size * 0.5) {
         if (!out.endsWith('\n')) out += '\n';
-      } else {
-        const gap = x - prevEndX;
-        const needsSpace = gap > size * 0.15 && !out.endsWith(' ') && !item.str.startsWith(' ');
-        if (needsSpace) out += ' ';
+      } else if (along > size * 0.15 && !out.endsWith(' ') && !item.str.startsWith(' ')) {
+        out += ' ';
       }
     }
 
     out += item.str;
     if (item.str.length > 0 || item.width > 0) {
-      prevEndX = x + item.width;
-      prevY = y;
+      prev = { x: x + item.width * dx, y: y + item.width * dy, dx, dy };
     }
     if (item.hasEOL) {
       out += '\n';
-      prevEndX = null;
-      prevY = null;
+      prev = null;
     }
   }
 
