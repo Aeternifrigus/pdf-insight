@@ -37,6 +37,7 @@ const request: AnalyzeRequest = {
     },
   ],
   images: [],
+  unreadPages: [],
 };
 
 const good = JSON.stringify(sampleModelOutput());
@@ -102,6 +103,7 @@ describe('analyzeDocument', () => {
       pageCount: 3,
       pages: [1, 2, 3].map((page) => ({ page, text: `Strona ${page} `.repeat(14_000) })),
       images: [],
+      unreadPages: [],
     };
     const reduce = JSON.stringify({
       document: sampleModelOutput().document,
@@ -113,6 +115,16 @@ describe('analyzeDocument', () => {
     expect(result.analysis.chunks).toBe(3);
     expect(llm.calls).toHaveLength(4);
     expect(result.amounts).toHaveLength(1);
+  });
+
+  it('mówi modelowi, których stron nie widzi, i zapisuje to w wyniku', async () => {
+    const llm = new FakeLlm([good]);
+    const result = await analyzeDocument(
+      { ...request, pageCount: 150, unreadPages: Array.from({ length: 148 }, (_, i) => i + 3) },
+      llm,
+    );
+    expect(llm.calls[0]?.turns[0]?.text).toContain('pages 3–150 of 150 could not be read');
+    expect(result.analysis.unreadPages).toHaveLength(148);
   });
 
   it('dołącza obraz zeskanowanej strony do zapytania', async () => {

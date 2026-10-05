@@ -47,6 +47,14 @@ export function ResultView({ insight, notes, onReset }: Props) {
             <dt>Objętość</dt>
             <dd>{pagesLabel(doc.pages)}</dd>
           </div>
+          <div className={analysis.unreadPages.length > 0 ? 'fact-warn' : undefined}>
+            <dt>Przeanalizowano</dt>
+            <dd>
+              {analysis.unreadPages.length > 0
+                ? `${String(doc.pages - analysis.unreadPages.length)} z ${String(doc.pages)} stron`
+                : 'cały dokument'}
+            </dd>
+          </div>
           <div>
             <dt>Język</dt>
             <dd>{languageName(doc.language)}</dd>

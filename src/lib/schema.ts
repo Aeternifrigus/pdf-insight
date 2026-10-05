@@ -103,6 +103,8 @@ export const analysisMetaSchema = z.object({
   createdAt: z.string(),
   chunks: z.number().int().min(1),
   ocrPages: z.array(z.number().int().min(1)),
+  /** Strony, których treść nie trafiła do analizy (skany ponad limit, błędy odczytu). */
+  unreadPages: z.array(z.number().int().min(1)).default([]),
   warnings: z.array(nonEmpty),
 });
 
@@ -164,6 +166,7 @@ export const analyzeRequestSchema = z
       .refine((p) => p.reduce((n, x) => n + x.text.length, 0) <= MAX_TEXT_CHARS, {
         message: 'Tekst dokumentu jest zbyt długi',
       }),
+    unreadPages: z.array(z.number().int().min(1)).max(2000).default([]),
     images: z
       .array(
         z.object({
@@ -184,6 +187,9 @@ export const analyzeRequestSchema = z
         ctx.addIssue({ code: 'custom', path: ['pages'], message: `Powtórzona strona ${page}` });
       }
       pageNumbers.add(page);
+    }
+    if (req.unreadPages.some((p) => p > req.pageCount)) {
+      ctx.addIssue({ code: 'custom', path: ['unreadPages'], message: 'Strona poza zakresem' });
     }
     const imagePages = new Set<number>();
     for (const { page } of req.images) {

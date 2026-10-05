@@ -42,6 +42,8 @@ export interface ExtractedPdf {
   images: { page: number; mimeType: 'image/jpeg'; data: string }[];
   /** Uwagi dla użytkownika o stronach, których nie udało się w pełni odczytać. */
   notes: string[];
+  /** Strony z treścią, która nie trafi do analizy (skany ponad limit, błędy odczytu). */
+  unreadPages: number[];
 }
 
 function throwIfAborted(signal?: AbortSignal) {
@@ -155,7 +157,8 @@ export async function extractPdf(
       notes.push(`${pagesWord(blank)} ${formatPageRanges(blank)} są puste i zostały pominięte.`);
     }
 
-    return { pageCount: pdf.numPages, pages, images, notes };
+    const unreadPages = [...new Set([...skipped, ...failed])].sort((a, b) => a - b);
+    return { pageCount: pdf.numPages, pages, images, notes, unreadPages };
   } finally {
     signal?.removeEventListener('abort', onAbort);
     void task.destroy();

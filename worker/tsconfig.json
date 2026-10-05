@@ -25,6 +25,7 @@
     "../src/lib/injection.ts",
     "../src/lib/textItems.ts",
     "../src/lib/merge.ts",
+    "../src/lib/ranges.ts",
     "../src/lib/fixtures.ts"
   ],
   "exclude": ["../src/lib/**/*.test.ts"]

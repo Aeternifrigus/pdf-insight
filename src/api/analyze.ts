@@ -49,7 +49,13 @@ export function isApiConfigured(): boolean {
 }
 
 export function buildRequest(fileName: string, pdf: ExtractedPdf): AnalyzeRequest {
-  return { fileName, pageCount: pdf.pageCount, pages: pdf.pages, images: pdf.images };
+  return {
+    fileName,
+    pageCount: pdf.pageCount,
+    pages: pdf.pages,
+    images: pdf.images,
+    unreadPages: pdf.unreadPages,
+  };
 }
 
 interface ErrorBody {

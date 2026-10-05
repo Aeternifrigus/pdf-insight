@@ -295,7 +295,13 @@ function chunkTurn(
     : '';
   return {
     role: 'user',
-    text: documentBlock(nonce, { pageCount: req.pageCount }, chunk, part) + note,
+    text:
+      documentBlock(
+        nonce,
+        { pageCount: req.pageCount, unreadPages: req.unreadPages },
+        chunk,
+        part,
+      ) + note,
     images: imgs,
   };
 }
@@ -334,7 +340,7 @@ export async function analyzeDocument(
   const deadline = Date.now() + budgetMs;
   const nonce = newNonce();
   const system = systemPrompt(nonce);
-  const meta = { pageCount: req.pageCount };
+  const meta = { pageCount: req.pageCount, unreadPages: req.unreadPages };
 
   let core: Pick<ModelOutput, 'document' | 'summary' | 'keyPoints'>;
   let lists: ReturnType<typeof mergeLists>;
@@ -384,6 +390,7 @@ export async function analyzeDocument(
       createdAt: now().toISOString(),
       chunks: chunks.length,
       ocrPages: req.images.map((i) => i.page).sort((a, b) => a - b),
+      unreadPages: req.unreadPages,
       warnings: combineWarnings(heuristic, lists.warnings),
     },
   };
