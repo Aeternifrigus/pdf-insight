@@ -4,10 +4,12 @@
  * trafia do modelu jako dane w wyraźnie oznaczonym bloku, a wynik jest
  * walidowany schematem. Wykrycie dodaje ostrzeżenie widoczne dla użytkownika.
  */
+// Wzorce są zapisane bez polskich znaków, bo tekst jest wcześniej "spłaszczany"
+// (ś → s, ł → l), żeby "wczesniejsze" i "wcześniejsze" dawały ten sam wynik.
 const PATTERNS: RegExp[] = [
   // PL
-  /zignoruj\s+(wszystkie\s+)?(wcześniejsze|poprzednie|powyższe)\s+(polecenia|instrukcje)/i,
-  /instrukcj[aęi]\s+dla\s+(systemu\s+)?(ai|sztucznej\s+inteligencji|modelu|asystenta)/i,
+  /zignoruj\s+(wszystkie\s+)?(wczesniejsze|poprzednie|powyzsze)\s+(polecenia|instrukcje)/i,
+  /instrukcj[aei]\s+dla\s+(systemu\s+)?(ai|sztucznej\s+inteligencji|modelu|asystenta)/i,
   /nie\s+wspominaj\s+o\s+(tej|tych)\s+instrukcj/i,
   // EN
   /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions|prompts|messages)/i,
@@ -19,6 +21,16 @@ const PATTERNS: RegExp[] = [
   /ignoriere\s+(alle\s+)?(vorherigen|bisherigen)\s+(anweisungen|befehle)/i,
 ];
 
+/** Usuwa znaki diakrytyczne i ujednolica odstępy. */
+export function foldText(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/ł/g, 'l')
+    .replace(/Ł/g, 'L')
+    .replace(/\s+/g, ' ');
+}
+
 export interface InjectionFinding {
   page: number;
   excerpt: string;
@@ -27,7 +39,7 @@ export interface InjectionFinding {
 export function detectInjection(pages: { page: number; text: string }[]): InjectionFinding[] {
   const findings: InjectionFinding[] = [];
   for (const { page, text } of pages) {
-    const normalized = text.replace(/\s+/g, ' ');
+    const normalized = foldText(text);
     for (const re of PATTERNS) {
       const m = re.exec(normalized);
       if (m) {
