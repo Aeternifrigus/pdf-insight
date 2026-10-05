@@ -212,8 +212,9 @@ export default function App() {
       <footer className="footer">
         <p>
           Tekst pliku (oraz obrazy stron bez warstwy tekstowej) jest wysyłany do zewnętrznego
-          dostawcy AI (Google Gemini) wyłącznie w celu analizy. Sam plik PDF nie opuszcza
-          przeglądarki. Nie wgrywaj dokumentów, których nie możesz udostępnić.
+          dostawcy AI (Google Gemini) w celu analizy. Sam plik PDF nie opuszcza przeglądarki. Demo
+          korzysta z darmowego planu API, w którym dostawca może wykorzystywać przesłane treści do
+          ulepszania swoich usług. Nie wgrywaj dokumentów poufnych ani danych osobowych.
         </p>
       </footer>
     </div>
