@@ -542,6 +542,18 @@ mark {
   padding: 0 0.15em;
 }
 
+.not-in-text {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--danger);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
 .timeline {
   margin: 0;
   padding: 0;

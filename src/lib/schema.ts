@@ -85,11 +85,17 @@ export const amountSchema = z.object({
   value: z.number(),
   currency: z.string().refine(isIsoCurrency, { message: 'Waluta musi być kodem ISO 4217' }),
   context: nonEmpty,
+  /**
+   * Pole dodatkowe: czy wartość występuje w tekście dokumentu (sprawdzane deterministycznie).
+   * null, gdy nie da się tego sprawdzić (część treści pochodzi ze skanów).
+   */
+  foundInText: z.boolean().nullable().optional(),
 });
 
 export const dateEntrySchema = z.object({
   date: isoDateSchema,
   context: nonEmpty,
+  foundInText: z.boolean().nullable().optional(),
 });
 
 export const entitiesSchema = z.object({

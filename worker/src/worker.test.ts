@@ -5,6 +5,7 @@ import {
   analyzeDocument,
   combineWarnings,
   extractJson,
+  groundLists,
   normalizeModelJson,
   parseUnambiguousNumber,
 } from './analyze';
@@ -279,6 +280,40 @@ describe('odpowiedzi Gemini', () => {
     const result = await analyzeDocument(request, createLlm({ GEMINI_API_KEY: 'k' }, fetchFn));
     expect(result.keyPoints.length).toBeGreaterThan(0);
     expect(seen[1]).toContain('cut off because it was too long');
+  });
+});
+
+describe('groundLists (kwoty i daty obecne w tekście)', () => {
+  it('oznacza i zgłasza wartość, której nie ma w dokumencie', async () => {
+    const out = JSON.stringify({
+      ...sampleModelOutput(),
+      amounts: [
+        { value: 184500, currency: 'PLN', context: 'wynagrodzenie' },
+        { value: 999999, currency: 'PLN', context: 'zmyślona' },
+      ],
+      dates: [{ date: '2026-03-12', context: 'zawarcie' }],
+    });
+    const result = await analyzeDocument(
+      {
+        ...request,
+        pages: [{ page: 1, text: 'Umowa z 12.03.2026 r. Wynagrodzenie 184 500,00 zł netto.' }],
+        pageCount: 1,
+      },
+      new FakeLlm([out]),
+    );
+    expect(result.amounts.map((a) => a.foundInText)).toEqual([true, false]);
+    expect(result.dates[0]?.foundInText).toBe(true);
+    expect(result.analysis.warnings.join(' ')).toContain('999999 PLN');
+  });
+
+  it('nie ocenia wartości, gdy część treści pochodzi ze skanów', () => {
+    const r = groundLists(
+      { pages: [{ page: 1, text: '' }], images: [{ page: 1, mimeType: 'image/jpeg', data: 'A' }] },
+      [{ value: 5, currency: 'PLN', context: 'x' }],
+      [],
+    );
+    expect(r.amounts[0]?.foundInText).toBeNull();
+    expect(r.warnings).toEqual([]);
   });
 });
 

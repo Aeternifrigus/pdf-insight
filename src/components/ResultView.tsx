@@ -16,6 +16,14 @@ interface Props {
   onReset: () => void;
 }
 
+function NotInText() {
+  return (
+    <span className="not-in-text" title="Tej wartości nie znaleziono w tekście dokumentu">
+      nie znaleziono w tekście
+    </span>
+  );
+}
+
 function Empty({ children }: { children: string }) {
   return <p className="muted">{children}</p>;
 }
@@ -114,7 +122,10 @@ export function ResultView({ insight, notes, onReset }: Props) {
                       <td className="amount">
                         <mark>{formatMoney(a.value, a.currency)}</mark>
                       </td>
-                      <td>{a.context}</td>
+                      <td>
+                        {a.context}
+                        {a.foundInText === false && <NotInText />}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -132,7 +143,10 @@ export function ResultView({ insight, notes, onReset }: Props) {
               {insight.dates.map((d, i) => (
                 <li key={`${String(i)}-${d.date}`}>
                   <time dateTime={d.date}>{formatDate(d.date)}</time>
-                  <span>{d.context}</span>
+                  <span>
+                    {d.context}
+                    {d.foundInText === false && <NotInText />}
+                  </span>
                 </li>
               ))}
             </ol>

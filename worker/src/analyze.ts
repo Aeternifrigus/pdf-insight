@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import { chunkPages, type Chunk } from '../../src/lib/chunk';
+import { amountInText, dateInText, foldForSearch, numbersInText } from '../../src/lib/grounding';
 import { detectInjection, injectionWarnings } from '../../src/lib/injection';
 import { dedupeStrings, mergeLists } from '../../src/lib/merge';
 import {
@@ -339,6 +340,44 @@ export function combineWarnings(heuristic: string[], fromModel: string[]): strin
   return dedupeStrings([...heuristic, ...model]);
 }
 
+/**
+ * Oznacza kwoty i daty, których nie da się odnaleźć w tekście dokumentu (możliwe zmyślenie
+ * albo wartość wyliczona przez model). Niczego nie usuwa: decyzję zostawia użytkownikowi.
+ * Gdy część treści pochodzi ze skanów, sprawdzenie nie jest możliwe (foundInText = null).
+ */
+export function groundLists(
+  req: Pick<AnalyzeRequest, 'pages' | 'images'>,
+  amounts: Insight['amounts'],
+  dates: Insight['dates'],
+): { amounts: Insight['amounts']; dates: Insight['dates']; warnings: string[] } {
+  if (req.images.length > 0) {
+    return {
+      amounts: amounts.map((a) => ({ ...a, foundInText: null })),
+      dates: dates.map((d) => ({ ...d, foundInText: null })),
+      warnings: [],
+    };
+  }
+  const text = req.pages.map((p) => p.text).join('\n');
+  const numbers = numbersInText(text);
+  const folded = foldForSearch(text);
+  const checkedAmounts = amounts.map((a) => ({
+    ...a,
+    foundInText: amountInText(a.value, numbers),
+  }));
+  const checkedDates = dates.map((d) => ({ ...d, foundInText: dateInText(d.date, folded) }));
+  const missing = [
+    ...checkedAmounts.filter((a) => !a.foundInText).map((a) => `${String(a.value)} ${a.currency}`),
+    ...checkedDates.filter((d) => !d.foundInText).map((d) => d.date),
+  ];
+  const warnings =
+    missing.length > 0
+      ? [
+          `Tych wartości nie znaleziono w tekście dokumentu, sprawdź je ręcznie: ${missing.slice(0, 10).join(', ')}${missing.length > 10 ? ` i ${String(missing.length - 10)} innych` : ''}.`,
+        ]
+      : [];
+  return { amounts: checkedAmounts, dates: checkedDates, warnings };
+}
+
 export async function analyzeDocument(
   req: AnalyzeRequest,
   llm: LlmClient,
@@ -400,13 +439,14 @@ export async function analyzeDocument(
   }
 
   const heuristic = injectionWarnings(detectInjection(req.pages));
+  const grounded = groundLists(req, lists.amounts, lists.dates);
   const insight: Insight = {
     document: { fileName: req.fileName, pages: req.pageCount, ...core.document },
     summary: core.summary,
     keyPoints: core.keyPoints,
     entities: lists.entities,
-    amounts: lists.amounts,
-    dates: lists.dates,
+    amounts: grounded.amounts,
+    dates: grounded.dates,
     keywords: lists.keywords,
     analysis: {
       model: llm.model,
@@ -414,7 +454,7 @@ export async function analyzeDocument(
       chunks: chunks.length,
       ocrPages: req.images.map((i) => i.page).sort((a, b) => a - b),
       unreadPages: req.unreadPages,
-      warnings: combineWarnings(heuristic, lists.warnings),
+      warnings: [...combineWarnings(heuristic, lists.warnings), ...grounded.warnings],
     },
   };
 
