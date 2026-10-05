@@ -9,3 +9,6 @@ worker/.wrangler
 coverage
 .DS_Store
 public/pdfjs
+test-results
+playwright-report
+e2e/.cache

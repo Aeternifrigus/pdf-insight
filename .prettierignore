@@ -3,3 +3,5 @@ node_modules
 package-lock.json
 worker/.wrangler
 public/pdfjs
+test-results
+playwright-report
