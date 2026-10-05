@@ -87,7 +87,12 @@ export function ResultView({ insight, notes, onReset }: Props) {
           {insight.amounts.length === 0 ? (
             <Empty>Dokument nie zawiera kwot.</Empty>
           ) : (
-            <div className="table-wrap" tabIndex={0} role="region" aria-labelledby="amounts-title">
+            <div
+              className="table-wrap"
+              tabIndex={0}
+              role="region"
+              aria-label="Tabela kwot (przewijana)"
+            >
               <table className="amounts">
                 <thead>
                   <tr>

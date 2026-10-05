@@ -67,6 +67,17 @@ body {
   font-family: var(--font);
   font-size: var(--step-0);
   line-height: 1.55;
+}
+
+/*
+ * Cyfry tabelaryczne tylko tam, gdzie liczby są w kolumnach lub zmieniają się w miejscu.
+ * Na całym body Schibsted Grotesk poszerza też przecinki i kropki (ok. 2,4×), co psuło
+ * zwykły tekst ("184 500 ,00", "sp . z o.o .").
+ */
+.amount,
+.timeline time,
+.progress-time,
+.json-code {
   font-variant-numeric: tabular-nums;
 }
 
