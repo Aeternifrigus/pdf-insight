@@ -41,6 +41,7 @@ const EXTRACTION_RULES = `RULES:
 - document.type: "faktura" (invoice), "umowa" (contract/agreement), "oferta" (offer/quote), "raport" (report), otherwise "inne". If an attachment is a different kind of document, classify by the main document.
 - amounts: monetary amounts explicitly written in the document. "value" is a JSON number with a dot as decimal separator (184 500,00 → 184500). "currency" is the ISO 4217 code of the currency as written (zł → PLN, € → EUR, $ → USD); never convert currencies. "context" briefly says what the amount is, including net/gross (netto/brutto) and period (monthly/yearly) when stated. Skip percentages. Do not repeat the same amount for the same purpose. If there are very many (e.g. long price lists), keep the 30 most important.
 - dates: only full calendar dates explicitly present in the document, as YYYY-MM-DD, with a short context. Skip dates without a day. At most 30, most important first.
+- Numeric dates follow the document's locale: in Polish and most European documents 03.04.2026 is 3 April. If a numeric date is ambiguous (day and month both 12 or less) and nothing in the document settles the order, skip it instead of guessing. Never add a year that is not written next to the date.
 - entities.organizations: companies and institutions named in the document. entities.people: full names of people named in the document, as written.
 - Pages marked as scans are attached as images. Read them carefully: they may contain amendments that change other terms. Include their facts.`;
 
