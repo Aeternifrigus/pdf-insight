@@ -90,12 +90,19 @@ export const amountSchema = z.object({
    * null, gdy nie da się tego sprawdzić (część treści pochodzi ze skanów).
    */
   foundInText: z.boolean().nullable().optional(),
+  /**
+   * Pole dodatkowe: powód, dla którego `foundInText` jest false. `currencyMismatch`: wartość jest
+   * w dokumencie tylko z inną walutą; `fromInstruction`: wartość występuje wyłącznie
+   * w podejrzanym poleceniu dla AI (możliwa manipulacja wynikiem).
+   */
+  issue: z.enum(['notInText', 'currencyMismatch', 'fromInstruction']).optional(),
 });
 
 export const dateEntrySchema = z.object({
   date: isoDateSchema,
   context: nonEmpty,
   foundInText: z.boolean().nullable().optional(),
+  issue: z.enum(['notInText', 'fromInstruction']).optional(),
 });
 
 export const entitiesSchema = z.object({

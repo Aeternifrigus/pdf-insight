@@ -1,8 +1,14 @@
 import type { z } from 'zod';
 import { chunkPages, type Chunk } from '../../src/lib/chunk';
-import { amountInText, dateInText, foldForSearch, numbersInText } from '../../src/lib/grounding';
+import {
+  buildEvidence,
+  checkAmount,
+  checkDate,
+  moneyMentions,
+  type Evidence,
+} from '../../src/lib/grounding';
 import { detectInjection, injectionWarnings } from '../../src/lib/injection';
-import { detectDecimalStyle } from '../../src/lib/localeNumbers';
+import { extractDates } from '../../src/lib/localeNumbers';
 import { dedupeStrings, mergeLists } from '../../src/lib/merge';
 import {
   formatIssues,
@@ -380,44 +386,121 @@ export function combineWarnings(heuristic: string[], fromModel: string[]): strin
   return dedupeStrings([...heuristic, ...model]);
 }
 
+const fmt = (value: number, currency: string) => `${String(value)} ${currency}`;
+
+function listWarning(prefix: string, items: string[]): string[] {
+  if (items.length === 0) return [];
+  const shown = items.slice(0, 10).join(', ');
+  const more = items.length > 10 ? ` i ${String(items.length - 10)} innych` : '';
+  return [`${prefix}: ${shown}${more}.`];
+}
+
 /**
- * Oznacza kwoty i daty, których nie da się odnaleźć w tekście dokumentu (możliwe zmyślenie
- * albo wartość wyliczona przez model). Niczego nie usuwa: decyzję zostawia użytkownikowi.
- * Gdy część treści pochodzi ze skanów, sprawdzenie nie jest możliwe (foundInText = null).
+ * Sprawdza kwoty i daty z wyniku w tekście dokumentu (bez AI). Niczego nie usuwa: oznacza
+ * pozycje (`foundInText`, `issue`) i dodaje ostrzeżenia, decyzję zostawia użytkownikowi.
+ * - Wartość obecna w dokumencie tylko w podejrzanym poleceniu (np. "1 PLN" z ukrytej instrukcji)
+ *   jest oznaczana zawsze. Wcześniej taka wartość była „znaleziona w tekście”, bo tekst polecenia
+ *   też jest tekstem dokumentu, więc kontrola potwierdzała właśnie skutek ataku.
+ * - Wartość, która w dokumencie występuje tylko z inną walutą (8 600 EUR podane jako PLN), też.
+ * - Wartość nieznaleziona w tekście przy obecnych skanach mogła pochodzić z obrazu:
+ *   foundInText = null (nie da się sprawdzić) zamiast false.
  */
 export function groundLists(
   req: Pick<AnalyzeRequest, 'pages' | 'images'>,
   amounts: Insight['amounts'],
   dates: Insight['dates'],
   languageHint?: string | null,
+  evidence: Evidence = buildEvidence(req.pages, languageHint),
 ): { amounts: Insight['amounts']; dates: Insight['dates']; warnings: string[] } {
-  // Ze skanami wartość nieznaleziona w tekście mogła pochodzić z obrazu: null = nie da się sprawdzić.
-  const notFound = req.images.length > 0 ? null : false;
-  const text = req.pages.map((p) => p.text).join('\n');
-  // Styl zapisu liczb (przecinek czy kropka dziesiętna) z tekstu, z językiem jako podpowiedzią.
-  const numbers = numbersInText(text, detectDecimalStyle(text, languageHint));
-  const folded = foldForSearch(text);
-  const checkedAmounts = amounts.map((a) => ({
-    ...a,
-    foundInText: amountInText(a.value, numbers) || notFound,
-  }));
-  const checkedDates = dates.map((d) => ({
-    ...d,
-    foundInText: dateInText(d.date, folded) || notFound,
-  }));
-  const missing = [
+  const scans = req.images.length > 0;
+  // Pola z kontroli są ustawiane od nowa (model nie może ich podać sam).
+  const withoutCheck = <T extends { foundInText?: unknown; issue?: unknown }>(item: T) => {
+    const copy = { ...item };
+    delete copy.foundInText;
+    delete copy.issue;
+    return copy;
+  };
+  const checkedAmounts: Insight['amounts'] = amounts.map((a) => {
+    const rest = withoutCheck(a);
+    const result = checkAmount(a.value, a.currency, evidence);
+    if (result === 'ok') return { ...rest, foundInText: true };
+    if (result === 'notInText' && scans) return { ...rest, foundInText: null };
+    return { ...rest, foundInText: false, issue: result };
+  });
+  const checkedDates: Insight['dates'] = dates.map((d) => {
+    const rest = withoutCheck(d);
+    const result = checkDate(d.date, evidence);
+    if (result === 'ok') return { ...rest, foundInText: true };
+    if (result === 'notInText' && scans) return { ...rest, foundInText: null };
+    return { ...rest, foundInText: false, issue: result };
+  });
+
+  const injected = [
     ...checkedAmounts
-      .filter((a) => a.foundInText === false)
-      .map((a) => `${String(a.value)} ${a.currency}`),
-    ...checkedDates.filter((d) => d.foundInText === false).map((d) => d.date),
+      .filter((a) => a.issue === 'fromInstruction')
+      .map((a) => fmt(a.value, a.currency)),
+    ...checkedDates.filter((d) => d.issue === 'fromInstruction').map((d) => d.date),
   ];
-  const warnings =
-    missing.length > 0
-      ? [
-          `Tych wartości nie znaleziono w tekście dokumentu, sprawdź je ręcznie: ${missing.slice(0, 10).join(', ')}${missing.length > 10 ? ` i ${String(missing.length - 10)} innych` : ''}.`,
-        ]
-      : [];
-  return { amounts: checkedAmounts, dates: checkedDates, warnings };
+  const mismatched = checkedAmounts
+    .filter((a) => a.issue === 'currencyMismatch')
+    .map((a) => {
+      const inDoc = [...(evidence.money.get(Math.round(Math.abs(a.value) * 100) / 100) ?? [])];
+      return `${fmt(a.value, a.currency)} (w dokumencie: ${inDoc.join('/')})`;
+    });
+  const missing = [
+    ...checkedAmounts.filter((a) => a.issue === 'notInText').map((a) => fmt(a.value, a.currency)),
+    ...checkedDates.filter((d) => d.issue === 'notInText').map((d) => d.date),
+  ];
+  return {
+    amounts: checkedAmounts,
+    dates: checkedDates,
+    warnings: [
+      ...listWarning(
+        'Wynik zawiera wartości, które w dokumencie występują tylko w podejrzanym poleceniu dla AI (możliwa manipulacja wynikiem)',
+        injected,
+      ),
+      ...listWarning('Waluta niezgodna z dokumentem', mismatched),
+      ...listWarning(
+        'Tych wartości nie znaleziono w tekście dokumentu, sprawdź je ręcznie',
+        missing,
+      ),
+    ],
+  };
+}
+
+/**
+ * To samo sprawdzenie dla kwot i dat zapisanych w podsumowaniu i najważniejszych punktach.
+ * Brief wymaga podsumowania „bez zmyślonych informacji”, a schemat sprawdza tylko jego format.
+ * Sprawdzane są tylko kwoty z walutą i pełne daty (nie każda liczba), żeby nie zgłaszać
+ * fałszywych alarmów dla liczb takich jak „5 etapów” czy „24 miesiące”.
+ */
+export function groundTexts(texts: string[], evidence: Evidence, scans: boolean): string[] {
+  const joined = texts.join('\n');
+  const injected = new Set<string>();
+  const mismatched = new Set<string>();
+  const missing = new Set<string>();
+  for (const m of moneyMentions(joined, evidence.style)) {
+    const result = checkAmount(m.value, m.currency, evidence);
+    if (result === 'fromInstruction') injected.add(fmt(m.value, m.currency));
+    else if (result === 'currencyMismatch') mismatched.add(fmt(m.value, m.currency));
+    else if (result === 'notInText' && !scans) missing.add(fmt(m.value, m.currency));
+  }
+  for (const date of extractDates(joined).dates) {
+    const result = checkDate(date, evidence);
+    if (result === 'fromInstruction') injected.add(date);
+    else if (result === 'notInText' && !scans) missing.add(date);
+  }
+  return [
+    ...listWarning(
+      'Podsumowanie lub najważniejsze punkty zawierają wartości, które w dokumencie występują tylko w podejrzanym poleceniu dla AI (możliwa manipulacja wynikiem, porównaj z dokumentem)',
+      [...injected],
+    ),
+    ...listWarning('Waluta w podsumowaniu niezgodna z dokumentem', [...mismatched]),
+    ...listWarning(
+      'Podsumowanie lub najważniejsze punkty zawierają wartości, których nie znaleziono w tekście dokumentu',
+      [...missing],
+    ),
+  ];
 }
 
 export async function analyzeDocument(
@@ -481,7 +564,13 @@ export async function analyzeDocument(
   }
 
   const heuristic = injectionWarnings(detectInjection(req.pages));
-  const grounded = groundLists(req, lists.amounts, lists.dates, core.document.language);
+  const evidence = buildEvidence(req.pages, core.document.language);
+  const grounded = groundLists(req, lists.amounts, lists.dates, core.document.language, evidence);
+  const textWarnings = groundTexts(
+    [core.summary, ...core.keyPoints],
+    evidence,
+    req.images.length > 0,
+  );
   const insight: Insight = {
     document: { fileName: req.fileName, pages: req.pageCount, ...core.document },
     summary: core.summary,
@@ -496,7 +585,11 @@ export async function analyzeDocument(
       chunks: chunks.length,
       ocrPages: req.images.map((i) => i.page).sort((a, b) => a - b),
       unreadPages: req.unreadPages,
-      warnings: [...combineWarnings(heuristic, lists.warnings), ...grounded.warnings],
+      warnings: [
+        ...combineWarnings(heuristic, lists.warnings),
+        ...textWarnings,
+        ...grounded.warnings,
+      ],
     },
   };
 

@@ -56,10 +56,38 @@ export function detectInjection(pages: { page: number; text: string }[]): Inject
   return findings;
 }
 
+/**
+ * Opisuje tylko to, co da się stwierdzić: że tekst jest w dokumencie i jak jest traktowany.
+ * Wcześniejsza wersja twierdziła „nie wykonano go”, czego kod nie może zagwarantować;
+ * to, czy wynik zawiera wartości z polecenia, sprawdza osobno `groundLists`/`groundTexts`.
+ */
 export function injectionWarnings(findings: InjectionFinding[]): string[] {
   return findings.map(
     (f) =>
-      `Strona ${f.page}: dokument zawiera tekst wyglądający na polecenie dla systemu AI. ` +
-      `Potraktowano go jako zwykłą treść i nie wykonano go.`,
+      `Strona ${String(f.page)}: dokument zawiera tekst wyglądający na polecenie dla systemu AI. ` +
+      `Analiza traktuje go jako zwykłą treść dokumentu, a nie jako polecenie.`,
   );
+}
+
+const matches = (text: string) => PATTERNS.some((re) => re.test(foldText(text)));
+
+/**
+ * Dzieli tekst na wiersze z podejrzanym poleceniem i resztę. Wiersz jest podejrzany, jeśli sam
+ * pasuje do wzorca albo razem z sąsiednim (fraza przełamana na dwa wiersze).
+ */
+export function splitInjectedLines(text: string): { clean: string; injected: string } {
+  const lines = text.split('\n');
+  const flagged = new Set<number>();
+  lines.forEach((line, i) => {
+    if (matches(line)) flagged.add(i);
+    const next = lines[i + 1];
+    if (next !== undefined && !matches(line) && !matches(next) && matches(`${line} ${next}`)) {
+      flagged.add(i);
+      flagged.add(i + 1);
+    }
+  });
+  return {
+    clean: lines.filter((_, i) => !flagged.has(i)).join('\n'),
+    injected: lines.filter((_, i) => flagged.has(i)).join('\n'),
+  };
 }
