@@ -225,6 +225,20 @@ describe('błędy dostawcy AI', () => {
     expect(parseRetryAfter(null, 'brak')).toBeNull();
   });
 
+  it('skraca limit czasu wywołania do pozostałego budżetu analizy', async () => {
+    const timeouts: (number | undefined)[] = [];
+    const llm: LlmClient = {
+      model: 'x',
+      complete: (_s, _t, timeoutMs) => {
+        timeouts.push(timeoutMs);
+        return Promise.resolve(good);
+      },
+    };
+    await analyzeDocument(request, llm, undefined, 20_000);
+    expect(timeouts[0]).toBeLessThanOrEqual(20_000);
+    expect(timeouts[0]).toBeGreaterThan(15_000);
+  });
+
   it('kończy analizę po przekroczeniu budżetu czasu', async () => {
     await expect(
       analyzeDocument(request, new FakeLlm([good]), undefined, 1000),

@@ -15,12 +15,13 @@ export interface Turn {
 
 export interface LlmClient {
   readonly model: string;
-  complete(system: string, turns: Turn[]): Promise<string>;
+  /** `timeoutMs` pozwala skrócić wywołanie do pozostałego budżetu czasu analizy. */
+  complete(system: string, turns: Turn[], timeoutMs?: number): Promise<string>;
 }
 
 type FetchFn = typeof fetch;
 
-const CALL_TIMEOUT_MS = 45_000;
+export const CALL_TIMEOUT_MS = 45_000;
 
 export function createLlm(env: Env, fetchFn: FetchFn = fetch): LlmClient {
   const provider = (env.LLM_PROVIDER ?? 'gemini').toLowerCase();
@@ -49,6 +50,7 @@ async function postJson(
   url: string,
   headers: Record<string, string>,
   body: unknown,
+  timeoutMs = CALL_TIMEOUT_MS,
 ): Promise<unknown> {
   let res: Response;
   try {
@@ -56,7 +58,7 @@ async function postJson(
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+      signal: AbortSignal.timeout(Math.max(1, Math.min(timeoutMs, CALL_TIMEOUT_MS))),
     });
   } catch (e) {
     throw new ProviderError(504, `Brak odpowiedzi dostawcy AI: ${(e as Error).name}`);
@@ -88,7 +90,6 @@ const BLOCK_REASONS = new Set([
   'SPII',
   'IMAGE_SAFETY',
   'LANGUAGE',
-  'OTHER',
 ]);
 
 class GeminiClient implements LlmClient {
@@ -98,7 +99,7 @@ class GeminiClient implements LlmClient {
     private readonly fetchFn: FetchFn,
   ) {}
 
-  async complete(system: string, turns: Turn[]): Promise<string> {
+  async complete(system: string, turns: Turn[], timeoutMs?: number): Promise<string> {
     const generationConfig: Record<string, unknown> = {
       responseMimeType: 'application/json',
       temperature: 0.1,
@@ -123,7 +124,13 @@ class GeminiClient implements LlmClient {
     };
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:generateContent`;
-    const data = (await postJson(this.fetchFn, url, { 'x-goog-api-key': this.apiKey }, body)) as {
+    const data = (await postJson(
+      this.fetchFn,
+      url,
+      { 'x-goog-api-key': this.apiKey },
+      body,
+      timeoutMs,
+    )) as {
       candidates?: {
         content?: { parts?: { text?: string; thought?: boolean }[] };
         finishReason?: string;
@@ -161,7 +168,7 @@ class OpenAiCompatibleClient implements LlmClient {
     private readonly fetchFn: FetchFn,
   ) {}
 
-  async complete(system: string, turns: Turn[]): Promise<string> {
+  async complete(system: string, turns: Turn[], timeoutMs?: number): Promise<string> {
     const messages = [
       { role: 'system', content: system },
       ...turns.map((t) => {
@@ -191,6 +198,7 @@ class OpenAiCompatibleClient implements LlmClient {
         max_tokens: 8192,
         response_format: { type: 'json_object' },
       },
+      timeoutMs,
     )) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
 
     const choice = data.choices?.[0];

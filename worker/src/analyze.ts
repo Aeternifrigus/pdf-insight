@@ -13,7 +13,7 @@ import {
   type ModelOutput,
 } from '../../src/lib/schema';
 import { AppError, ProviderError, TruncatedResponseError } from './errors';
-import type { LlmClient, LlmImage, Turn } from './llm';
+import { CALL_TIMEOUT_MS, type LlmClient, type LlmImage, type Turn } from './llm';
 import {
   documentBlock,
   newNonce,
@@ -191,7 +191,8 @@ export async function callValidated<S extends z.ZodType>(
     }
     let raw: string;
     try {
-      raw = await llm.complete(system, turns);
+      // Pojedyncze wywołanie nie może wyjść poza budżet całej analizy.
+      raw = await llm.complete(system, turns, Math.min(CALL_TIMEOUT_MS, deadline - Date.now()));
     } catch (e) {
       if (e instanceof TruncatedResponseError) {
         // Ucięty JSON: zamiast ogólnego "popraw błędy" prosimy wprost o krótszą odpowiedź.
