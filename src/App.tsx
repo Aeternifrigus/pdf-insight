@@ -35,6 +35,8 @@ export default function App() {
     const startedAt = Date.now();
 
     const check = await checkPdfFile(file);
+    // W międzyczasie użytkownik mógł wybrać inny plik.
+    if (cancelled()) return;
     if (!check.ok) {
       setPhase({ kind: 'error', message: check.message, details: [], retryFile: null });
       return;
@@ -44,11 +46,15 @@ export default function App() {
       setPhase({ kind: 'reading', fileName: file.name, done: 0, total: 0, startedAt });
       // pdf.js (ok. 1,5 MB) ładowany dopiero przy pierwszym pliku.
       const { extractPdf } = await import('./lib/pdf');
-      const pdf = await extractPdf(file, (done, total) => {
-        if (!cancelled()) {
-          setPhase({ kind: 'reading', fileName: file.name, done, total, startedAt });
-        }
-      });
+      const pdf = await extractPdf(
+        file,
+        (done, total) => {
+          if (!cancelled()) {
+            setPhase({ kind: 'reading', fileName: file.name, done, total, startedAt });
+          }
+        },
+        ctrl.signal,
+      );
       if (cancelled()) return;
 
       const hasText = pdf.pages.some((p) => p.text.trim().length > 0);
@@ -66,12 +72,7 @@ export default function App() {
       const insight = await analyze(buildRequest(file.name, pdf), ctrl.signal);
       if (cancelled()) return;
 
-      const notes =
-        pdf.skippedScanPages.length > 0
-          ? [
-              `Strony ${pdf.skippedScanPages.join(', ')} nie mają warstwy tekstowej i nie zostały odczytane (limit to 4 zeskanowane strony).`,
-            ]
-          : [];
+      const notes = pdf.notes;
       const next = addToHistory(insight);
       setHistory(next);
       setPhase({ kind: 'result', insight, notes, historyId: next[0]?.id ?? null });

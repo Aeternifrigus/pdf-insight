@@ -1,37 +1,68 @@
-import { getDocument, GlobalWorkerOptions, PasswordException } from 'pdfjs-dist';
-import type { PDFPageProxy } from 'pdfjs-dist';
+import { getDocument, GlobalWorkerOptions, OPS, PasswordException } from 'pdfjs-dist';
+import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 // Import z ?url sprawia, że Vite kopiuje workera do dist/ i zwraca ścieżkę z uwzględnieniem `base`
 // (na GitHub Pages: /<repo>/assets/pdf.worker-*.mjs). Bez tego worker pdf.js zwraca 404.
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { PdfReadError } from './file';
-import { MAX_IMAGE_BASE64_CHARS, MAX_IMAGES } from './schema';
+import { isBlankImage, renderScale, selectScanPages, type PageInfo } from './scan';
+import { MAX_IMAGE_BASE64_CHARS, MAX_IMAGES, MAX_TEXT_CHARS } from './schema';
 import { joinTextItems } from './textItems';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
-/** Strona z mniejszą liczbą znaków traktowana jest jako skan bez warstwy tekstowej. */
-export const SCAN_TEXT_THRESHOLD = 30;
-const RENDER_MAX_WIDTH = 1400;
+/**
+ * Zasoby pdf.js kopiowane do public/pdfjs (scripts/copy-pdfjs-assets.mjs):
+ * - wasm: dekodery JPEG 2000 i JBIG2, typowych w skanach (bez nich skan renderuje się na biało),
+ * - cmaps: kodowania fontów CID (bez nich tekst części PDF-ów jest nieczytelny),
+ * - standard_fonts: fonty standardowe niewbudowane w plik,
+ * - iccs: profile kolorów CMYK.
+ */
+const ASSETS = `${import.meta.env.BASE_URL}pdfjs/`;
+
+const IMAGE_OPS = new Set<number>([
+  OPS.paintImageXObject,
+  OPS.paintInlineImageXObject,
+  OPS.paintImageMaskXObject,
+  OPS.paintImageXObjectRepeat,
+  OPS.paintInlineImageXObjectGroup,
+]);
 
 export interface ExtractedPdf {
   pageCount: number;
   pages: { page: number; text: string }[];
   images: { page: number; mimeType: 'image/jpeg'; data: string }[];
-  /** Strony bez tekstu, których nie wysłano jako obraz (powyżej limitu). */
-  skippedScanPages: number[];
+  /** Uwagi dla użytkownika o stronach, których nie udało się w pełni odczytać. */
+  notes: string[];
+}
+
+function throwIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted) throw new DOMException('Anulowano', 'AbortError');
 }
 
 export async function extractPdf(
   file: File,
   onProgress?: (done: number, total: number) => void,
+  signal?: AbortSignal,
 ): Promise<ExtractedPdf> {
   const data = new Uint8Array(await file.arrayBuffer());
-  const task = getDocument({ data });
-  let pdf;
+  const task = getDocument({
+    data,
+    wasmUrl: `${ASSETS}wasm/`,
+    cMapUrl: `${ASSETS}cmaps/`,
+    cMapPacked: true,
+    standardFontDataUrl: `${ASSETS}standard_fonts/`,
+    iccUrl: `${ASSETS}iccs/`,
+  });
+  const onAbort = () => void task.destroy();
+  signal?.addEventListener('abort', onAbort, { once: true });
+
+  let pdf: PDFDocumentProxy;
   try {
     pdf = await task.promise;
   } catch (e) {
+    signal?.removeEventListener('abort', onAbort);
     void task.destroy();
+    throwIfAborted(signal);
     if (e instanceof PasswordException) {
       throw new PdfReadError('Plik jest zabezpieczony hasłem. Usuń hasło i spróbuj ponownie.');
     }
@@ -39,32 +70,84 @@ export async function extractPdf(
   }
 
   try {
+    if (pdf.numPages > 2000) {
+      throw new PdfReadError(`Plik ma ${pdf.numPages} stron. Limit to 2000 stron.`);
+    }
+
     const pages: ExtractedPdf['pages'] = [];
-    const images: ExtractedPdf['images'] = [];
-    const skippedScanPages: number[] = [];
+    const info: PageInfo[] = [];
+    const failed: number[] = [];
 
+    // Etap 1: tekst wszystkich stron. Błąd jednej strony nie przerywa całego odczytu.
     for (let n = 1; n <= pdf.numPages; n++) {
-      const page = await pdf.getPage(n);
-      const text = await pageText(page);
-      pages.push({ page: n, text });
-
-      if (text.replace(/\s/g, '').length < SCAN_TEXT_THRESHOLD) {
-        if (images.length < MAX_IMAGES) {
-          const image = await renderPage(page);
-          if (image) images.push({ page: n, mimeType: 'image/jpeg', data: image });
-          else skippedScanPages.push(n);
-        } else {
-          skippedScanPages.push(n);
-        }
+      throwIfAborted(signal);
+      try {
+        const page = await pdf.getPage(n);
+        const text = await pageText(page);
+        const hasImages = text.length < 400 ? await pageHasImages(page) : false;
+        pages.push({ page: n, text });
+        info.push({ page: n, textChars: text.replace(/\s/g, '').length, hasImages });
+        page.cleanup();
+      } catch {
+        throwIfAborted(signal);
+        failed.push(n);
+        pages.push({ page: n, text: '' });
+        info.push({ page: n, textChars: 0, hasImages: true });
       }
-      page.cleanup();
       onProgress?.(n, pdf.numPages);
     }
 
-    return { pageCount: pdf.numPages, pages, images, skippedScanPages };
+    const totalChars = pages.reduce((s, p) => s + p.text.length, 0);
+    if (totalChars > MAX_TEXT_CHARS) {
+      throw new PdfReadError(
+        `Dokument ma ${totalChars.toLocaleString('pl-PL')} znaków tekstu. Limit to ${MAX_TEXT_CHARS.toLocaleString('pl-PL')}.`,
+      );
+    }
+
+    // Etap 2: strony bez użytecznej warstwy tekstowej renderujemy do JPEG.
+    const { selected, skipped } = selectScanPages(info, MAX_IMAGES);
+    const images: ExtractedPdf['images'] = [];
+    const blank: number[] = [];
+    for (const n of selected) {
+      throwIfAborted(signal);
+      try {
+        const page = await pdf.getPage(n);
+        const result = await renderPage(page);
+        page.cleanup();
+        if (result?.kind === 'blank') blank.push(n);
+        else if (result?.kind === 'image') {
+          images.push({ page: n, mimeType: 'image/jpeg', data: result.data });
+        } else failed.push(n);
+      } catch {
+        throwIfAborted(signal);
+        failed.push(n);
+      }
+    }
+
+    const notes: string[] = [];
+    if (skipped.length > 0) {
+      notes.push(
+        `${pagesWord(skipped)} ${skipped.join(', ')} wyglądają na skany i nie zostały odczytane (limit to ${MAX_IMAGES} zeskanowane strony).`,
+      );
+    }
+    if (failed.length > 0) {
+      notes.push(
+        `Nie udało się odczytać: ${pagesWord(failed).toLowerCase()} ${[...new Set(failed)].sort((a, b) => a - b).join(', ')}.`,
+      );
+    }
+    if (blank.length > 0) {
+      notes.push(`${pagesWord(blank)} ${blank.join(', ')} są puste i zostały pominięte.`);
+    }
+
+    return { pageCount: pdf.numPages, pages, images, notes };
   } finally {
+    signal?.removeEventListener('abort', onAbort);
     void task.destroy();
   }
+}
+
+function pagesWord(list: number[]): string {
+  return list.length === 1 ? 'Strona' : 'Strony';
 }
 
 async function pageText(page: PDFPageProxy): Promise<string> {
@@ -72,24 +155,52 @@ async function pageText(page: PDFPageProxy): Promise<string> {
   return joinTextItems(content.items.filter((item) => 'str' in item));
 }
 
-/** Renderuje stronę do JPEG (base64) na potrzeby odczytu skanu przez model multimodalny. */
-async function renderPage(page: PDFPageProxy): Promise<string | null> {
+async function pageHasImages(page: PDFPageProxy): Promise<boolean> {
+  const ops = await page.getOperatorList();
+  return ops.fnArray.some((fn) => IMAGE_OPS.has(fn));
+}
+
+/**
+ * Renderuje stronę do JPEG (base64) na potrzeby odczytu skanu przez model multimodalny.
+ * Zwraca null, gdy nie da się utworzyć kontekstu canvas.
+ */
+type RenderResult = { kind: 'image'; data: string } | { kind: 'blank' } | { kind: 'too-large' };
+
+async function renderPage(page: PDFPageProxy): Promise<RenderResult | null> {
   const base = page.getViewport({ scale: 1 });
-  const scale = Math.min(2, RENDER_MAX_WIDTH / base.width);
-  const viewport = page.getViewport({ scale });
+  // Limit pikseli chroni przed przekroczeniem maksymalnego rozmiaru canvas (np. iOS Safari).
+  const viewport = page.getViewport({ scale: renderScale(base.width, base.height) });
   const canvas = document.createElement('canvas');
-  canvas.width = Math.floor(viewport.width);
-  canvas.height = Math.floor(viewport.height);
+  canvas.width = Math.max(1, Math.floor(viewport.width));
+  canvas.height = Math.max(1, Math.floor(viewport.height));
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   await page.render({ canvas, canvasContext: ctx, viewport }).promise;
 
-  for (const quality of [0.75, 0.6, 0.45]) {
-    const dataUrl = canvas.toDataURL('image/jpeg', quality);
-    const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
-    if (b64.length <= MAX_IMAGE_BASE64_CHARS) return b64;
+  if (isBlankCanvas(canvas)) return { kind: 'blank' };
+
+  try {
+    for (const quality of [0.75, 0.6, 0.45, 0.3]) {
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+      if (b64.length <= MAX_IMAGE_BASE64_CHARS) return { kind: 'image', data: b64 };
+    }
+    return { kind: 'too-large' };
+  } finally {
+    // Zwolnienie pamięci canvas (ważne na telefonach).
+    canvas.width = 0;
+    canvas.height = 0;
   }
-  return null;
+}
+
+function isBlankCanvas(source: HTMLCanvasElement): boolean {
+  const thumb = document.createElement('canvas');
+  thumb.width = 256;
+  thumb.height = 256;
+  const ctx = thumb.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return false;
+  ctx.drawImage(source, 0, 0, 256, 256);
+  return isBlankImage(ctx.getImageData(0, 0, 256, 256).data);
 }
