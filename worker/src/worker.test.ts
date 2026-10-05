@@ -12,7 +12,13 @@ import type { Env } from './env';
 import { AppError, ProviderError } from './errors';
 import { handle } from './router';
 import { createLlm, parseRetryAfter, type LlmClient, type Turn } from './llm';
-import { neutralizeTags } from './prompt';
+import {
+  IMPORTANCE_RULES,
+  neutralizeTags,
+  reduceSystemPrompt,
+  systemPrompt,
+  truncatedRetryPrompt,
+} from './prompt';
 
 class FakeLlm implements LlmClient {
   readonly model = 'fake-model';
@@ -345,6 +351,19 @@ describe('combineWarnings', () => {
       ),
     ).toEqual(['Strona 4: polecenie dla systemu AI', 'Brak podpisu']);
     expect(combineWarnings([], ['Ukryta instrukcja dla AI'])).toEqual(['Ukryta instrukcja dla AI']);
+  });
+});
+
+describe('priorytety ważności w promptach', () => {
+  it('analiza, łączenie części i ponowna próba używają tych samych priorytetów', () => {
+    expect(systemPrompt('n')).toContain(IMPORTANCE_RULES);
+    expect(reduceSystemPrompt('n')).toContain(IMPORTANCE_RULES);
+    expect(truncatedRetryPrompt()).toContain('IMPORTANCE');
+  });
+
+  it('wymagają okresu obowiązywania umowy i pierwszeństwa zmian z aneksu', () => {
+    expect(IMPORTANCE_RULES).toContain('term start and end');
+    expect(IMPORTANCE_RULES).toContain('The changed value is the current one');
   });
 });
 
