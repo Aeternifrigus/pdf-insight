@@ -1,3 +1,5 @@
+import { cleanText } from './textItems';
+
 /**
  * Heurystyczne wykrywanie prób prompt injection w treści PDF.
  * To tylko warstwa sygnalizacyjna: główną ochroną jest to, że treść dokumentu
@@ -21,9 +23,10 @@ const PATTERNS: RegExp[] = [
   /ignoriere\s+(alle\s+)?(vorherigen|bisherigen)\s+(anweisungen|befehle)/i,
 ];
 
-/** Usuwa znaki diakrytyczne i ujednolica odstępy. */
+/** Usuwa znaki ukryte i diakrytyczne, ujednolica odstępy. */
 export function foldText(text: string): string {
-  return text
+  // Backend nie ufa, że klient wyczyścił tekst, więc czyszczenie jest powtórzone tutaj.
+  return cleanText(text)
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
     .replace(/ł/g, 'l')

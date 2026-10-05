@@ -23,6 +23,7 @@
     "../src/lib/sentences.ts",
     "../src/lib/chunk.ts",
     "../src/lib/injection.ts",
+    "../src/lib/textItems.ts",
     "../src/lib/merge.ts",
     "../src/lib/fixtures.ts"
   ],
