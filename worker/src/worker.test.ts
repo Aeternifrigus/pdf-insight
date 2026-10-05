@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { sampleModelOutput } from '../../src/lib/fixtures';
 import { insightSchema, type AnalyzeRequest } from '../../src/lib/schema';
+import { combineWarnings, groundLists, verifyInsight } from '../../src/lib/verify';
 import {
   analyzeDocument,
-  combineWarnings,
   extractJson,
-  groundLists,
   normalizeModelJson,
   parseUnambiguousNumber,
 } from './analyze';
@@ -54,8 +53,11 @@ describe('analyzeDocument', () => {
     expect(llm.calls).toHaveLength(1);
   });
 
-  it('dodaje ostrzeżenie, gdy dokument zawiera polecenie dla AI', async () => {
-    const result = await analyzeDocument(request, new FakeLlm([good]));
+  it('kontrola w przeglądarce dodaje ostrzeżenie, gdy dokument zawiera polecenie dla AI', async () => {
+    const raw = await analyzeDocument(request, new FakeLlm([good]));
+    // Backend nie wykonuje już kontroli (limit CPU), robi to verifyInsight po stronie klienta.
+    expect(raw.analysis.warnings.some((w) => w.includes('Strona 2'))).toBe(false);
+    const result = verifyInsight(raw, request);
     expect(result.analysis.warnings.some((w) => w.includes('Strona 2'))).toBe(true);
   });
 
@@ -293,14 +295,12 @@ describe('groundLists (kwoty i daty obecne w tekście)', () => {
       ],
       dates: [{ date: '2026-03-12', context: 'zawarcie' }],
     });
-    const result = await analyzeDocument(
-      {
-        ...request,
-        pages: [{ page: 1, text: 'Umowa z 12.03.2026 r. Wynagrodzenie 184 500,00 zł netto.' }],
-        pageCount: 1,
-      },
-      new FakeLlm([out]),
-    );
+    const source = {
+      ...request,
+      pages: [{ page: 1, text: 'Umowa z 12.03.2026 r. Wynagrodzenie 184 500,00 zł netto.' }],
+      pageCount: 1,
+    };
+    const result = verifyInsight(await analyzeDocument(source, new FakeLlm([out])), source);
     expect(result.amounts.map((a) => a.foundInText)).toEqual([true, false]);
     expect(result.dates[0]?.foundInText).toBe(true);
     expect(result.analysis.warnings.join(' ')).toContain('999999 PLN');

@@ -28,6 +28,7 @@
     "../src/lib/ranges.ts",
     "../src/lib/grounding.ts",
     "../src/lib/localeNumbers.ts",
+    "../src/lib/verify.ts",
     "../src/lib/fixtures.ts"
   ],
   "exclude": ["../src/lib/**/*.test.ts"]

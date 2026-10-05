@@ -30,6 +30,7 @@ import {
   type HistoryEntry,
 } from './lib/history';
 import type { ExtractedPdf } from './lib/pdf';
+import { verifyInsight } from './lib/verify';
 import type { Insight, OutputLanguage } from './lib/schema';
 
 /** Błąd jako dane: tekst powstaje przy wyświetlaniu, w bieżącym języku interfejsu. */
@@ -149,7 +150,9 @@ export default function App() {
       }
 
       setPhase({ kind: 'analyzing', fileName: file.name, startedAt });
-      const insight = await analyze(buildRequest(file.name, pdf), ctrl.signal);
+      const raw = await analyze(buildRequest(file.name, pdf), ctrl.signal);
+      // Kontrole deterministyczne na tekście, który przeglądarka już ma (bez kosztu CPU Workera).
+      const insight = verifyInsight(raw, pdf);
       if (cancelled()) return;
 
       const next = addToHistory(insight, undefined, fileHash);

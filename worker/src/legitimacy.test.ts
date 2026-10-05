@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { sampleModelOutput } from '../../src/lib/fixtures';
 import { buildEvidence, checkAmount, moneyMentions } from '../../src/lib/grounding';
 import { splitInjectedLines } from '../../src/lib/injection';
-import { analyzeDocument } from './analyze';
+import { verifyInsight } from '../../src/lib/verify';
+import { analyzeDocument as analyzeRaw } from './analyze';
 import type { LlmClient } from './llm';
 
 // Fragment odtwarzający pułapki z umowy testowej: trzy waluty i ukryte polecenie z kwotą.
@@ -25,6 +26,10 @@ const keyPoints = [
   'Licencje rozliczane w EUR',
   'Hosting rozliczany w USD',
 ];
+/** Pełny przepływ aplikacji: analiza w backendzie, potem kontrole w przeglądarce. */
+const analyzeDocument = async (r: typeof req, client: LlmClient) =>
+  verifyInsight(await analyzeRaw(r, client), r);
+
 const llm = (out: object): LlmClient => ({
   model: 'm',
   complete: () => Promise.resolve(JSON.stringify(out)),

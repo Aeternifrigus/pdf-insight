@@ -196,3 +196,18 @@ test('w polskim interfejsie nie ma angielskich etykiet poza przełącznikiem ję
   await expect(resultSwitch).toContainText('Angielski');
   await expect(resultSwitch).not.toContainText('English');
 });
+
+test('kontrole w przeglądarce: ostrzeżenie o poleceniu dla AI i oznaczenie wartości spoza dokumentu', async ({
+  page,
+}) => {
+  // Mock zwraca wynik dla innego dokumentu (umowa), więc kwota 184 500 zł nie występuje
+  // w tekście wgranej faktury i musi zostać oznaczona; plik zawiera ukryte polecenie.
+  await mockApi(page);
+  await page.goto('./');
+  await upload(page, 'text-with-injection.pdf');
+  await expect(page.getByRole('heading', { name: 'Podsumowanie' })).toBeVisible();
+  const warnings = page.getByRole('complementary', { name: 'Na co uważać' });
+  await expect(warnings).toContainText('Strona 1: dokument zawiera tekst wyglądający na polecenie');
+  await expect(warnings).toContainText('Tych wartości nie znaleziono w tekście dokumentu');
+  await expect(page.locator('table.amounts')).toContainText('nie znaleziono w tekście');
+});
