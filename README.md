@@ -50,7 +50,12 @@ worker/src/     backend: router HTTP, CORS, limity, prompty, klient LLM, analiza
 - **Cloudflare Workers jako backend.** Darmowy plan wystarcza z dużym zapasem, nie usypia się jak darmowe serwery, a klucz API trzymany jest jako sekret Workera (`wrangler secret put`). Frontend zna tylko publiczny adres API.
 - **PDF nie opuszcza przeglądarki.** Tekst wyciąga pdf.js po stronie klienta, a do backendu trafia wyłącznie tekst stron i obrazy stron zeskanowanych. Dzięki temu żądania są małe, a limit 10 MB dotyczy pliku, nie transferu.
 - **Jeden schemat Zod dla frontendu i backendu** (`src/lib/schema.ts`). Backend waliduje odpowiedź modelu i przy błędzie robi dokładnie jedną ponowną próbę, przekazując modelowi listę błędów. Frontend waliduje wynik ponownie przed wyświetleniem i nie ufa ślepo backendowi.
-- **Pola wyliczane deterministycznie nie pochodzą od modelu.** `fileName` i `pages` ustawia kod, model nie może ich zmienić. Dodane pole `analysis` (model, data, liczba fragmentów, strony ze skanu, ostrzeżenia) jest dozwolone przez brief („pola można dodawać”).
+- **Pola wyliczane deterministycznie nie pochodzą od modelu.** `fileName` i `pages` ustawia kod, model nie może ich zmienić. Dodane pole `analysis` (model, data, liczba fragmentów, strony ze skanu, strony nieodczytane, ostrzeżenia) jest dozwolone przez brief („pola można dodawać”).
+- **Kwoty i daty są sprawdzane w tekście dokumentu** (bez AI, `src/lib/grounding.ts`). Każda pozycja dostaje dodatkowe pole `foundInText`: `true` (występuje w tekście, w dowolnym typowym zapisie: „184 500,00”, „1,234.56”, „4,2 mln”, „12.03.2026”, „12 marca 2026”), `false` (nie występuje: możliwe zmyślenie lub wartość wyliczona przez model, oznaczona w widoku i w ostrzeżeniach) albo `null` (nie da się sprawdzić, bo część treści pochodzi ze skanów). Nic nie jest usuwane; decyzja należy do użytkownika.
+- **Pokrycie analizy jest jawne.** Gdy część stron nie mogła zostać odczytana (np. skany ponad limit), model dostaje o tym informację, wynik zawiera `analysis.unreadPages`, a widok pokazuje np. „Przeanalizowano: 4 z 150 stron”. Częściowa analiza nigdy nie wygląda na pełną.
+- **Pola formularzy.** Wartości wypełnionych pól AcroForm nie należą do warstwy tekstowej strony, więc są odczytywane osobno (`src/lib/forms.ts`) i dołączane do tekstu jako „[Pola formularza]”.
+- **Czyszczenie tekstu.** Ligatury (ﬁ → fi), twarde i wąskie spacje, miękkie łączniki, znaki zerowej szerokości, znaki sterujące kierunkiem tekstu i znaki kontrolne są normalizowane przed wysłaniem do modelu i przed heurystykami.
+- **Ten sam plik nie jest analizowany dwa razy.** Wynik w historii jest powiązany z SHA-256 pliku; ponowne wgranie identycznego pliku pokazuje zapisany wynik (z przyciskiem „Przeanalizuj ten plik ponownie”), co oszczędza darmowy limit API.
 - **Walidacja jest ścisła tam, gdzie brief stawia twarde reguły:** język ISO 639-1, waluta z listy ISO 4217, prawdziwa data kalendarzowa ISO 8601, 3–7 punktów, 3–5 zdań (licznik zdań z obsługą polskich skrótów i inicjałów). Drobne różnice formatu (np. `zł` zamiast `PLN`, liczba jako tekst) są normalizowane przed walidacją, ale treść nie jest zgadywana.
 - **Skany przez model multimodalny zamiast Tesseract.** Strona bez użytecznej warstwy tekstowej jest renderowana do JPEG i wysyłana razem z tekstem. Za skan uznajemy stronę z mniej niż 30 znakami tekstu albo stronę z obrazem i mniej niż 400 znakami (skan z dodanym nagłówkiem lub pieczątką archiwum, którego sam próg znaków nie wyłapie). Przy limicie 4 obrazów pierwszeństwo mają strony z najmniejszą ilością tekstu. Puste strony są pomijane (pusty obraz zachęca model do zmyślania). Z aplikacją publikowane są dekodery WASM pdf.js (JPEG 2000, JBIG2), bez których typowe skany archiwalne renderują się na biało. Gemini czyta polski tekst ze skanu lepiej niż Tesseract w przeglądarce i nie trzeba pobierać ok. 10 MB danych językowych. W testowej umowie to właśnie skan (Załącznik 5, aneks) zmienia abonament i liczbę użytkowników.
 - **Długie dokumenty: map-reduce.** Tekst dzielony jest po granicach stron na fragmenty do 150 tys. znaków (ok. 40 tys. tokenów, model ma okno 1 mln), więc nawet dokument z limitem to maks. 3 fragmenty i 1 wywołanie łączące, co mieści się w darmowym limicie zapytań. Fragmenty są analizowane maks. po 2 równolegle, listy są łączone deterministycznie z usunięciem duplikatów, a podsumowanie całości powstaje w osobnym, krótkim wywołaniu.
@@ -82,7 +87,7 @@ Wymagania: Node.js 22+, darmowy klucz [Google AI Studio](https://aistudio.google
 npm ci
 
 # Backend
-cp worker/.dev.vars.example worker/.dev.vars   # wpisz GEMINI_API_KEY
+cp worker/.dev.vars.example worker/.dev.vars   # wpisz GEMINI_API_KEY (plik dopuszcza też originy localhost)
 npm run dev:worker                              # http://localhost:8787
 
 # Frontend (w drugim terminalu)
@@ -90,18 +95,18 @@ cp .env.example .env.local                      # VITE_API_URL=http://localhost:
 npm run dev                                     # http://localhost:5173/pdf-insight/
 ```
 
-Pozostałe polecenia: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run format`.
+Pozostałe polecenia: `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`, `npm run build`, `npm run format`.
 
 ### Zmienne środowiskowe
 
-| Zmienna                    | Gdzie                                               | Opis                                                              |
-| -------------------------- | --------------------------------------------------- | ----------------------------------------------------------------- |
-| `VITE_API_URL`             | frontend (`.env.local`, w CI: zmienna repozytorium) | adres Workera, bez końcowego `/`                                  |
-| `VITE_BASE_PATH`           | frontend (ustawiane w CI)                           | ścieżka GitHub Pages, domyślnie `/pdf-insight/`                   |
-| `GEMINI_API_KEY`           | Worker, sekret                                      | klucz Google AI Studio                                            |
-| `GEMINI_MODEL`             | Worker, `wrangler.toml`                             | domyślnie `gemini-2.5-flash`                                      |
-| `ALLOWED_ORIGINS`          | Worker, `wrangler.toml`                             | dozwolone originy, oddzielone przecinkami                         |
-| `LLM_PROVIDER`, `OPENAI_*` | Worker                                              | opcjonalnie dowolne API zgodne z OpenAI (np. Groq) zamiast Gemini |
+| Zmienna                    | Gdzie                                               | Opis                                                                 |
+| -------------------------- | --------------------------------------------------- | -------------------------------------------------------------------- |
+| `VITE_API_URL`             | frontend (`.env.local`, w CI: zmienna repozytorium) | adres Workera, bez końcowego `/`                                     |
+| `VITE_BASE_PATH`           | frontend (ustawiane w CI)                           | ścieżka GitHub Pages, domyślnie `/pdf-insight/`                      |
+| `GEMINI_API_KEY`           | Worker, sekret                                      | klucz Google AI Studio                                               |
+| `GEMINI_MODEL`             | Worker, `wrangler.toml`                             | domyślnie `gemini-2.5-flash`                                         |
+| `ALLOWED_ORIGINS`          | Worker, `wrangler.toml` (lokalnie `.dev.vars`)      | dozwolone originy, oddzielone przecinkami; w produkcji bez localhost |
+| `LLM_PROVIDER`, `OPENAI_*` | Worker                                              | opcjonalnie dowolne API zgodne z OpenAI (np. Groq) zamiast Gemini    |
 
 ## Wdrożenie
 
@@ -111,14 +116,18 @@ Pozostałe polecenia: `npm run lint`, `npm run typecheck`, `npm test`, `npm run 
 
 ## Testy
 
-Vitest, 69 testów jednostkowych:
+**Vitest, 89 testów jednostkowych:**
 
 - `src/lib/schema.test.ts`: walidacja schematu (wymagane pola, ISO 8601, ISO 4217, ISO 639-1, liczba zdań i punktów, dodatkowe pola) i żądania (limity, powtórzone strony, obrazy dla nieistniejących stron);
-- `src/lib/text.test.ts`: licznik zdań, składanie tekstu z pdf.js (także strony obrócone), wykrywanie prompt injection, podział na fragmenty, łączenie wyników;
+- `src/lib/text.test.ts`: licznik zdań, składanie i czyszczenie tekstu z pdf.js (strony obrócone, ligatury, znaki ukryte), wykrywanie prompt injection, podział na fragmenty, łączenie wyników, zakresy stron;
 - `src/lib/scan.test.ts`: wybór stron do odczytu ze skanu, wykrywanie pustych stron, skala renderowania;
-- `src/lib/history.test.ts`: historia w `localStorage` (limit, uszkodzone dane);
+- `src/lib/forms.test.ts`: wartości pól formularzy;
+- `src/lib/grounding.test.ts`: odnajdywanie kwot i dat w tekście (zapisy PL/EN, mnożniki, kolumny tabel);
+- `src/lib/history.test.ts`: historia w `localStorage` (limit, uszkodzone dane, zgodność wstecz, ten sam plik);
 - `src/api/analyze.test.ts`: limit czasu i anulowanie żądania;
-- `worker/src/worker.test.ts`: analiza z atrapą LLM (ponowienie po błędnej odpowiedzi, błąd po drugiej próbie, map-reduce, obrazy skanów, izolacja treści dokumentu i nazwy pliku, HTTP 429, budżet czasu, ukrywanie błędów dostawcy, normalizacja formatów), CORS, limit rozmiaru i liczby żądań.
+- `worker/src/worker.test.ts`: analiza z atrapą LLM (ponowienie po błędnej odpowiedzi, błąd po drugiej próbie, map-reduce, części bez pełnego podsumowania, obrazy skanów, izolacja treści i nazwy pliku, pokrycie, sprawdzanie kwot i dat, HTTP 429, budżet czasu, odmowy i ucięte odpowiedzi Gemini, ukrywanie błędów dostawcy, normalizacja formatów), CORS, limit rozmiaru i liczby żądań.
+
+**Playwright, 13 testów E2E** (`e2e/`, uruchamiane w CI przed wdrożeniem): zbudowana aplikacja w Chromium, backend mockowany przez `page.route`, a każde żądanie wysłane przez frontend jest walidowane schematem. Pliki w `e2e/fixtures/` (z generatorem `generate.py`) odtwarzają przypadki, które kiedyś powodowały błędy: skan z nagłówkiem tekstowym, skan JPEG 2000, wypełniony formularz, pusta strona, PDF z hasłem, HTML z rozszerzeniem .pdf. Testy sprawdzają też pobranie JSON, ponowienie po błędzie API, odrzucenie odpowiedzi niezgodnej ze schematem, wynik z historii dla tego samego pliku, układ przy 360 px i brak naruszeń CSP. Sprawdziłem, że testy faktycznie łapią regresje: po celowym przywróceniu dwóch naprawionych błędów odpowiednie testy nie przechodzą.
 
 ### Przypadki brzegowe sprawdzone w przeglądarce
 
@@ -134,6 +143,11 @@ Każdy plik przeszedł przez prawdziwy interfejs w headless Chromium (z atrapą 
 | Paragon 200 × 14 000 pt                                           | render ograniczony do 4 mln pikseli (bez przekroczenia limitu canvas)          |
 | PDF z hasłem / uszkodzony / 11 MB / HTML z rozszerzeniem .pdf     | czytelny komunikat, bez przycisku ponowienia                                   |
 | Biały tekst „Ignore all previous instructions”                    | ostrzeżenie dla użytkownika                                                    |
+| Wypełniony formularz (kwota i data tylko w polach)                | wartości pól trafiają do analizy (wcześniej ginęły)                            |
+| 150 stron skanów z nagłówkiem                                     | „Przeanalizowano: 4 z 150 stron”, ostrzeżenie „Strony 5–150 …”                 |
+| 700 stron tekstu (ponad limit)                                    | przerwanie odczytu na stronie 539 z czytelnym komunikatem                      |
+| Wynik modelu z kwotami spoza dokumentu                            | pozycje oznaczone „nie znaleziono w tekście” i wymienione w ostrzeżeniu        |
+| Tryb ciemny, audyt axe-core                                       | brak naruszeń dostępności, kontrast poprawny w obu motywach                    |
 | Szerokość 360 px                                                  | brak poziomego przewijania                                                     |
 | CSP                                                               | brak naruszeń w konsoli                                                        |
 
@@ -142,7 +156,9 @@ Każdy plik przeszedł przez prawdziwy interfejs w headless Chromium (z atrapą 
 - **OCR** obejmuje maks. 4 strony bez warstwy tekstowej na dokument (limit rozmiaru żądania i czasu odpowiedzi). Pominięte strony są wymienione w ostrzeżeniu.
 - **Strony mieszane** (dużo tekstu plus wklejony skan, np. pieczątka z treścią) nie są renderowane, więc treść samego obrazu jest pomijana.
 - **Bardzo długie strony** (np. paragony) są renderowane w niższej rozdzielczości; drobny tekst może być nieczytelny dla modelu. Lepsze byłoby cięcie strony na kafelki.
-- **Ukryty tekst** (biały, mikroskopijny, poza stroną) nie jest osobno wykrywany. Trafia do modelu jako dane i jest sygnalizowany tylko wtedy, gdy wygląda na polecenie.
+- **Ukryty tekst** (biały, mikroskopijny, poza stroną) nie jest osobno wykrywany. Trafia do modelu jako dane i jest sygnalizowany tylko wtedy, gdy wygląda na polecenie. Homoglify (np. cyrylickie „о” w „ignоre”) omijają heurystykę.
+- **Sprawdzanie w tekście dotyczy tylko kwot i dat.** Nazwy osób i firm nie są sprawdzane, bo w polskim tekście występują w odmianie („Annę Kowalczyk”), a model podaje mianownik. Kwota wyliczona przez model (np. suma rat) zostanie oznaczona jako nieznaleziona, choć może być poprawna.
+- **Pola formularzy XFA** (formularze dynamiczne) nie są obsługiwane; pdf.js odczytuje tylko AcroForm.
 - **Prywatność:** demo działa na darmowym planie Gemini API, w którym Google może wykorzystywać przesłane treści do ulepszania usług. Aplikacja ostrzega o tym użytkownika; do dokumentów poufnych potrzebny byłby plan płatny.
 - **Darmowy limit Gemini** (kilka–kilkanaście zapytań na minutę) przy wielu użytkownikach naraz kończy się komunikatem „spróbuj ponownie za minutę” (po jednej automatycznej próbie z odczekaniem). Długi dokument zużywa do 4 zapytań.
 - **Alternatywny dostawca zgodny z OpenAI** (np. Groq) ma na darmowym planie niskie limity tokenów na minutę; duże fragmenty 150 tys. znaków mogą ich nie zmieścić. Nazwę modelu warto sprawdzić przed użyciem.
