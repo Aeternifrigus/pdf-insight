@@ -23,6 +23,12 @@ describe('countSentences', () => {
     expect(countSentences('Umowa obowiązuje od 1 kwietnia 2026 r. Strony ustaliły SLA.')).toBe(2);
   });
 
+  it('nie dzieli zdania po "r." przed liczbą', () => {
+    expect(
+      countSentences('Od 1 kwietnia 2027 r. 13 100,00 zł netto obowiązuje nowy abonament.'),
+    ).toBe(1);
+  });
+
   it('zwraca 0 dla pustego tekstu', () => {
     expect(countSentences('   ')).toBe(0);
   });

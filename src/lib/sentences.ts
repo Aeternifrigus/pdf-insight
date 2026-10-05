@@ -1,6 +1,7 @@
 /**
  * Przybliżone liczenie zdań (PL/EN/DE) na potrzeby walidacji podsumowania.
- * Kropka kończy zdanie, gdy po niej jest odstęp i wielka litera / cyfra,
+ * Kropka kończy zdanie, gdy po niej jest odstęp i wielka litera (nie cyfra:
+ * w polskich tekstach "2027 r. 13 100 zł" to wciąż jedno zdanie),
  * a słowo przed kropką nie jest typowym skrótem ani inicjałem.
  */
 const ABBREVIATIONS = new Set(
@@ -54,13 +55,12 @@ const ABBREVIATIONS = new Set(
     'z.b',
     'bzw',
     'ca',
-    'nr',
     'str',
     'u.a',
   ].map((a) => a.toLowerCase()),
 );
 
-const BOUNDARY = /[.!?…]+["'”»)]*\s+(?=["'„«(]?[\p{Lu}\d])/gu;
+const BOUNDARY = /[.!?…]+["'”»)]*\s+(?=["'„«(]?\p{Lu})/gu;
 
 export function countSentences(text: string): number {
   const trimmed = text.trim();
