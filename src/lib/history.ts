@@ -1,12 +1,15 @@
 import { insightSchema, type Insight } from './schema';
 
-const KEY = 'pdf-insight:history:v1';
+export const HISTORY_KEY = 'pdf-insight:history:v1';
+const KEY = HISTORY_KEY;
 export const HISTORY_LIMIT = 8;
 
 export interface HistoryEntry {
   id: string;
   savedAt: string;
   insight: Insight;
+  /** SHA-256 pliku: ten sam plik nie zużywa ponownie limitu API. */
+  fileHash?: string;
 }
 
 interface StorageLike {
@@ -36,7 +39,8 @@ export function loadHistory(store: StorageLike | null = storage()): HistoryEntry
       const e = entry as Record<string, unknown>;
       const insight = insightSchema.safeParse(e.insight);
       if (typeof e.id !== 'string' || typeof e.savedAt !== 'string' || !insight.success) return [];
-      return [{ id: e.id, savedAt: e.savedAt, insight: insight.data }];
+      const fileHash = typeof e.fileHash === 'string' ? e.fileHash : undefined;
+      return [{ id: e.id, savedAt: e.savedAt, insight: insight.data, fileHash }];
     });
   } catch {
     return [];
@@ -66,14 +70,34 @@ function persist(entries: HistoryEntry[], store: StorageLike | null): HistoryEnt
 export function addToHistory(
   insight: Insight,
   store: StorageLike | null = storage(),
+  fileHash?: string,
 ): HistoryEntry[] {
   const entry: HistoryEntry = {
     id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     savedAt: new Date().toISOString(),
     insight,
+    fileHash,
   };
-  const next = [entry, ...loadHistory(store)].slice(0, HISTORY_LIMIT);
+  // Nowa analiza tego samego pliku zastępuje poprzednią zamiast tworzyć duplikat.
+  const rest = loadHistory(store).filter((e) => !fileHash || e.fileHash !== fileHash);
+  const next = [entry, ...rest].slice(0, HISTORY_LIMIT);
   return persist(next, store);
+}
+
+export function findByHash(
+  fileHash: string,
+  store: StorageLike | null = storage(),
+): HistoryEntry | undefined {
+  return loadHistory(store).find((e) => e.fileHash === fileHash);
+}
+
+export async function hashFile(file: Blob): Promise<string | undefined> {
+  try {
+    const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+    return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return undefined;
+  }
 }
 
 export function removeFromHistory(

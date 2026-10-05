@@ -9,6 +9,9 @@ import { checkPdfFile, PdfReadError } from './lib/file';
 import {
   addToHistory,
   clearHistory,
+  findByHash,
+  hashFile,
+  HISTORY_KEY,
   loadHistory,
   removeFromHistory,
   type HistoryEntry,
@@ -20,12 +23,30 @@ type Phase =
   | { kind: 'reading'; fileName: string; done: number; total: number; startedAt: number }
   | { kind: 'analyzing'; fileName: string; startedAt: number }
   | { kind: 'error'; message: string; details: string[]; retryFile: File | null }
-  | { kind: 'result'; insight: Insight; notes: string[]; historyId: string | null };
+  | {
+      kind: 'result';
+      insight: Insight;
+      notes: string[];
+      historyId: string | null;
+      /** Plik, który można przeanalizować ponownie (wynik pochodzi z historii). */
+      cachedFile?: File;
+    };
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>({ kind: 'empty' });
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
   const controller = useRef<AbortController | null>(null);
+
+  // Historia zmieniona w innej karcie: odświeżamy listę, żeby nie nadpisać jej starszą wersją.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === HISTORY_KEY || e.key === null) setHistory(loadHistory());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
 
   // Plik upuszczony poza strefą wgrywania nie może otworzyć się zamiast aplikacji.
   useEffect(() => {
@@ -40,7 +61,7 @@ export default function App() {
     };
   }, []);
 
-  const run = useCallback(async (file: File) => {
+  const run = useCallback(async (file: File, force = false) => {
     controller.current?.abort();
     const ctrl = new AbortController();
     controller.current = ctrl;
@@ -52,6 +73,21 @@ export default function App() {
     if (cancelled()) return;
     if (!check.ok) {
       setPhase({ kind: 'error', message: check.message, details: [], retryFile: null });
+      return;
+    }
+
+    // Ten sam plik był już analizowany: pokazujemy zapisany wynik zamiast zużywać limit API.
+    const fileHash = await hashFile(file);
+    if (cancelled()) return;
+    const cached = fileHash && !force ? findByHash(fileHash) : undefined;
+    if (cached) {
+      setPhase({
+        kind: 'result',
+        insight: cached.insight,
+        notes: ['Ten plik był już analizowany. Pokazano zapisany wynik.'],
+        historyId: cached.id,
+        cachedFile: file,
+      });
       return;
     }
 
@@ -86,7 +122,7 @@ export default function App() {
       if (cancelled()) return;
 
       const notes = pdf.notes;
-      const next = addToHistory(insight);
+      const next = addToHistory(insight, undefined, fileHash);
       setHistory(next);
       setPhase({ kind: 'result', insight, notes, historyId: next[0]?.id ?? null });
     } catch (e) {
@@ -179,7 +215,18 @@ export default function App() {
           )}
 
           {phase.kind === 'result' && (
-            <ResultView insight={phase.insight} notes={phase.notes} onReset={reset} />
+            <ResultView
+              insight={phase.insight}
+              notes={phase.notes}
+              onReset={reset}
+              onReanalyze={
+                phase.cachedFile
+                  ? () => {
+                      if (phase.cachedFile) void run(phase.cachedFile, true);
+                    }
+                  : undefined
+              }
+            />
           )}
 
           {phase.kind === 'empty' && history.length === 0 && (

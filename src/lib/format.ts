@@ -63,7 +63,8 @@ export function downloadJson(insight: Insight): void {
   document.body.append(a);
   a.click();
   a.remove();
+  // Safari na iOS potrafi zacząć pobieranie z opóźnieniem; zbyt wczesne zwolnienie adresu je przerywa.
   setTimeout(() => {
     URL.revokeObjectURL(url);
-  }, 1000);
+  }, 60_000);
 }

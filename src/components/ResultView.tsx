@@ -14,6 +14,8 @@ interface Props {
   insight: Insight;
   notes: string[];
   onReset: () => void;
+  /** Ponowna analiza pliku, którego wynik pochodzi z historii. */
+  onReanalyze?: () => void;
 }
 
 function NotInText() {
@@ -28,7 +30,7 @@ function Empty({ children }: { children: string }) {
   return <p className="muted">{children}</p>;
 }
 
-export function ResultView({ insight, notes, onReset }: Props) {
+export function ResultView({ insight, notes, onReset, onReanalyze }: Props) {
   const { document: doc, analysis } = insight;
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -205,6 +207,11 @@ export function ResultView({ insight, notes, onReset }: Props) {
       <JsonPreview insight={insight} />
 
       <div className="actions result-actions">
+        {onReanalyze && (
+          <button type="button" className="button button-primary" onClick={onReanalyze}>
+            Przeanalizuj ten plik ponownie
+          </button>
+        )}
         <button type="button" className="button button-ghost" onClick={onReset}>
           Przeanalizuj kolejny plik
         </button>

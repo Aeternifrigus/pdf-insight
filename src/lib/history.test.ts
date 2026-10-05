@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sampleInsight } from './fixtures';
-import { addToHistory, HISTORY_LIMIT, loadHistory, removeFromHistory } from './history';
+import { addToHistory, findByHash, HISTORY_LIMIT, loadHistory, removeFromHistory } from './history';
 
 function memoryStore() {
   const data = new Map<string, string>();
@@ -29,6 +29,27 @@ describe('history', () => {
     const store = memoryStore();
     for (let i = 0; i < HISTORY_LIMIT + 3; i++) addToHistory(sampleInsight(), store);
     expect(loadHistory(store)).toHaveLength(HISTORY_LIMIT);
+  });
+
+  it('ten sam plik (hash) zastępuje poprzedni wpis i jest odnajdywany', () => {
+    const store = memoryStore();
+    addToHistory(sampleInsight(), store, 'abc');
+    addToHistory(sampleInsight(), store, 'def');
+    addToHistory(sampleInsight(), store, 'abc');
+    expect(loadHistory(store)).toHaveLength(2);
+    expect(findByHash('abc', store)?.fileHash).toBe('abc');
+    expect(findByHash('zzz', store)).toBeUndefined();
+  });
+
+  it('wczytuje wpisy zapisane przez starszą wersję (bez nowych pól)', () => {
+    const store = memoryStore();
+    const old = sampleInsight() as unknown as Record<string, Record<string, unknown>>;
+    delete old.analysis?.unreadPages;
+    store.setItem(
+      'pdf-insight:history:v1',
+      JSON.stringify([{ id: 'x', savedAt: '2026-10-01T10:00:00Z', insight: old }]),
+    );
+    expect(loadHistory(store)[0]?.insight.analysis.unreadPages).toEqual([]);
   });
 
   it('pomija uszkodzone wpisy niezgodne ze schematem', () => {
