@@ -41,6 +41,24 @@ describe('history', () => {
     expect(findByHash('zzz', store)).toBeUndefined();
   });
 
+  it('nie używa ponownie wyniku z innej wersji potoku', () => {
+    const store = memoryStore();
+    store.setItem(
+      'pdf-insight:history:v1',
+      JSON.stringify([
+        {
+          id: 'old',
+          savedAt: '2026-10-01T10:00:00Z',
+          insight: sampleInsight(),
+          fileHash: 'abc',
+          pipelineVersion: 1,
+        },
+      ]),
+    );
+    expect(findByHash('abc', store)).toBeUndefined();
+    expect(loadHistory(store)).toHaveLength(1);
+  });
+
   it('wczytuje wpisy zapisane przez starszą wersję (bez nowych pól)', () => {
     const store = memoryStore();
     const old = sampleInsight() as unknown as Record<string, Record<string, unknown>>;

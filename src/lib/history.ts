@@ -4,12 +4,20 @@ export const HISTORY_KEY = 'pdf-insight:history:v1';
 const KEY = HISTORY_KEY;
 export const HISTORY_LIMIT = 8;
 
+/**
+ * Wersja potoku (odczyt PDF + analiza). Podnoszona przy każdej zmianie, która może zmienić wynik
+ * dla tego samego pliku. Wynik z historii jest używany ponownie tylko przy zgodnej wersji;
+ * inaczej poprawka błędu nie dotarłaby do plików analizowanych wcześniej.
+ */
+export const PIPELINE_VERSION = 4;
+
 export interface HistoryEntry {
   id: string;
   savedAt: string;
   insight: Insight;
   /** SHA-256 pliku: ten sam plik nie zużywa ponownie limitu API. */
   fileHash?: string;
+  pipelineVersion?: number;
 }
 
 interface StorageLike {
@@ -40,7 +48,8 @@ export function loadHistory(store: StorageLike | null = storage()): HistoryEntry
       const insight = insightSchema.safeParse(e.insight);
       if (typeof e.id !== 'string' || typeof e.savedAt !== 'string' || !insight.success) return [];
       const fileHash = typeof e.fileHash === 'string' ? e.fileHash : undefined;
-      return [{ id: e.id, savedAt: e.savedAt, insight: insight.data, fileHash }];
+      const pipelineVersion = typeof e.pipelineVersion === 'number' ? e.pipelineVersion : undefined;
+      return [{ id: e.id, savedAt: e.savedAt, insight: insight.data, fileHash, pipelineVersion }];
     });
   } catch {
     return [];
@@ -77,6 +86,7 @@ export function addToHistory(
     savedAt: new Date().toISOString(),
     insight,
     fileHash,
+    pipelineVersion: PIPELINE_VERSION,
   };
   // Nowa analiza tego samego pliku zastępuje poprzednią zamiast tworzyć duplikat.
   const rest = loadHistory(store).filter((e) => !fileHash || e.fileHash !== fileHash);
@@ -88,7 +98,9 @@ export function findByHash(
   fileHash: string,
   store: StorageLike | null = storage(),
 ): HistoryEntry | undefined {
-  return loadHistory(store).find((e) => e.fileHash === fileHash);
+  return loadHistory(store).find(
+    (e) => e.fileHash === fileHash && e.pipelineVersion === PIPELINE_VERSION,
+  );
 }
 
 export async function hashFile(file: Blob): Promise<string | undefined> {
