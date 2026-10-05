@@ -40,7 +40,7 @@
 
 ## Przegląd krytyczny i przypadki brzegowe
 
-Po zbudowaniu pierwszej wersji poprosiłem: _„think of yourself as OP data engineer and web app developer. critique the repo and check its edge cases”_. Każde podejrzenie było najpierw potwierdzane testem, który nie przechodził, a dopiero potem poprawiane (osobny commit z testem regresyjnym). Do testów w przeglądarce wygenerowałem zestaw nietypowych PDF-ów (skan z nagłówkiem, JPEG 2000, pusta strona, paragon, hasło, uszkodzony plik, biały tekst). Znalezione i poprawione błędy:
+Po zbudowaniu pierwszej wersji poprosiłem: _„think of yourself as OP data engineer and web app developer. criticeuq the repo and check its edge cases”_ (pisownia oryginalna). Każde podejrzenie było najpierw potwierdzane testem, który nie przechodził, a dopiero potem poprawiane (osobny commit z testem regresyjnym). Do testów w przeglądarce wygenerowałem zestaw nietypowych PDF-ów (skan z nagłówkiem, JPEG 2000, pusta strona, paragon, hasło, uszkodzony plik, biały tekst). Znalezione i poprawione błędy:
 
 8. **Utrata danych ze skanów z nagłówkiem.** Skan, do którego skaner dodał linijkę tekstu, miał ponad 30 znaków, więc nie był renderowany i cała jego treść znikała bez ostrzeżenia. Teraz strona z obrazem i krótkim tekstem też jest traktowana jako skan.
 9. **Białe strony zamiast skanów JPEG 2000.** Nie skonfigurowałem `wasmUrl` w pdf.js, więc dekoder JPEG 2000 się nie ładował i model dostawał pusty obraz. Teraz dekodery WASM, CMapy i fonty pdf.js są publikowane z aplikacją, a puste rendery nie trafiają do modelu.
@@ -70,7 +70,29 @@ Sprawdziłem też rzeczy, które okazały się w porządku: runtime Workers ma p
 
 Na koniec przeniosłem testy przeglądarkowe z prywatnego skryptu do repozytorium jako zestaw Playwright (13 testów, mock API, pliki PDF z przypadkami brzegowymi) i dodałem go do CI przed wdrożeniem. Celowo przywróciłem dwa naprawione błędy (brak dekodera JPEG 2000, brak pól formularza), żeby potwierdzić, że testy je wykrywają.
 
+## Trzeci przegląd i wersja dwujęzyczna
+
+Prompt (pisownia oryginalna): _„think of yourself as OP data engineer and web app developer. criticeuq the repo and check its edge cases. add polish and english lang and doc will be translated from polish to english and the summary and json can be downloaded in english as well. Keep in note of , and . distinction betwene english and Polish.”_
+
+Przegląd zacząłem od przecinka i kropki, bo aplikacja w kilku miejscach traktowała liczby bez znajomości języka:
+
+26. **Sprawdzanie kwot w tekście (moje z drugiego przeglądu) ukrywało błędy o czynnik 1000.** Akceptowało oba zapisy naraz, więc polskie „12,345 zł” potwierdzało kwotę 12 345 zwróconą przez model, a angielskie „1,234 USD” potwierdzało 1,234. Teraz liczby są czytane według stylu zapisu dokumentu, wykrytego z samego tekstu.
+27. **Pamięć podręczna tego samego pliku nie wygasała.** Po poprawce w potoku ponowne wgranie pliku pokazywałoby stary, błędny wynik. Wpisy mają teraz wersję potoku.
+28. **Wszystkie teksty i formaty były tylko polskie**, w tym komunikaty z backendu i uwagi z odczytu PDF zapisane jako gotowe zdania. Zamieniłem je na kody i dane, a tekst powstaje w interfejsie w wybranym języku.
+
+Decyzje przy tłumaczeniu (najważniejsze z punktu widzenia danych):
+
+- Model tłumaczy wyłącznie teksty. Wartości liczbowe, waluty i daty w JSON są kopiowane z oryginału, więc nie mogą się zmienić.
+- Liczby w samych tekstach są sprawdzane deterministycznie (`compareNumericContent`): wartości brakujące, dodane i zapisane w złej notacji. Prompt podaje przykłady konwersji („184 500,00 zł” → „PLN 184,500.00”, „99,5%” → „99.5%”, „4,2 mln zł” → „PLN 4.2 million”) i każe zostawić bez zmian numery umów, NIP, KRS, rachunki, kody pocztowe i godziny.
+- Daty w tekście angielskim w formie „12 March 2026”, nigdy „03/12/2026” (UK i USA czytają to różnie).
+
+Błędy znalezione podczas budowy tej części:
+
+29. **Kolejność w routerze.** Po dodaniu nowych endpointów klient AI był tworzony przed walidacją treści, więc błędne żądanie na źle skonfigurowanym serwerze dostawało 500 zamiast 400. Wyłapał to test endpointu.
+30. **Szumny raport tłumaczenia.** Pełny test (frontend, Worker, atrapa modelu zwracająca polski zapis w tekście angielskim) pokazał, że „2 500 000,00” było raportowane jako zły zapis i dodatkowo jako „dodane 0” (część „,00” czytana osobno). Liczba w złym zapisie, ale z dobrą wartością, jest teraz raportowana tylko raz, jako problem zapisu.
+31. **Przełącznik języka wyniku na 360 px** rozpadał się na dwie linie; etykieta jest teraz nad przyciskami, które zawsze zostają razem.
+
 ## Weryfikacja
 
-- `npm run lint`, `npm run typecheck`, `npm test` (89 testów), `npm run test:e2e` (13 testów) i `npm run build` przechodzą bez błędów i ostrzeżeń.
+- `npm run lint`, `npm run typecheck`, `npm test` (120 testów), `npm run test:e2e` (18 testów) i `npm run build` przechodzą bez błędów i ostrzeżeń.
 - Test end-to-end w headless Chromium na pliku testowym i na nietypowych PDF-ach (tabela w README): odczyt 12 stron, strona 11 wyrenderowana do JPEG i wysłana do modelu, ostrzeżenie o instrukcji ze strony 4, brak poziomego przewijania przy 360 px, pobranie pliku `.json`, historia po przeładowaniu, komunikat błędu dla pliku, który nie jest PDF-em.

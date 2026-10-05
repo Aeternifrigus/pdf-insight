@@ -6,6 +6,8 @@ Aplikacja webowa, która wczytuje plik PDF, tworzy jego krótkie podsumowanie i 
 
 ![Zrzut ekranu: wynik analizy umowy testowej](docs/screenshot.png)
 
+![Zrzut ekranu: ten sam wynik w interfejsie angielskim, po przetłumaczeniu](docs/screenshot-en.png)
+
 ## Co potrafi
 
 | Wymaganie                                                             | Status                      | Gdzie                                                           |
@@ -20,6 +22,10 @@ Aplikacja webowa, która wczytuje plik PDF, tworzy jego krótkie podsumowanie i 
 | F-08 Długie dokumenty: podział na fragmenty i łączenie                | ✅ map-reduce               | `src/lib/chunk.ts`, `src/lib/merge.ts`, `worker/src/analyze.ts` |
 | F-09 Historia analiz w przeglądarce                                   | ✅ ostatnie 8               | `src/lib/history.ts`                                            |
 | F-10 OCR skanów                                                       | ✅ przez model multimodalny | `src/lib/pdf.ts` (render strony do JPEG)                        |
+| Interfejs po polsku i angielsku (przełącznik PL/EN, domyślnie PL)     | ✅ dodatkowe                | `src/i18n/`                                                     |
+| Wynik po angielsku: podsumowanie, punkty, opisy kwot i dat            | ✅ dodatkowe                | `worker/src/translate.ts`, `src/components/ResultView.tsx`      |
+| Pobranie JSON i podsumowania `.md` po polsku i po angielsku           | ✅ dodatkowe                | `src/lib/exportMarkdown.ts`                                     |
+| Tłumaczenie całego dokumentu na angielski (`.md`, strona po stronie)  | ✅ dodatkowe                | `src/lib/documentTranslation.ts`                                |
 
 ## Architektura
 
@@ -34,15 +40,19 @@ Przeglądarka (React SPA, GitHub Pages)          Cloudflare Worker (API proxy)  
 └──────────────────────────────────┘   JSON    └──────────────────────────────────┘
 ```
 
+Endpointy: `POST /analyze` (analiza), `POST /translate` (tłumaczenie wyniku), `POST /translate-document` (jeden fragment dokumentu do tłumaczenia), `GET /health`. Analiza i tłumaczenie mają osobne limity żądań.
+
 Struktura katalogów:
 
 ```
 src/
   api/          klient HTTP backendu (timeout, błędy, walidacja odpowiedzi)
   components/   komponenty UI
+  i18n/         słowniki PL/EN, kontekst języka, komunikaty błędów według kodów
   lib/          logika bez UI: schemat Zod, pdf.js, podział tekstu, łączenie wyników,
-                wykrywanie prompt injection, historia; współdzielona z backendem
-worker/src/     backend: router HTTP, CORS, limity, prompty, klient LLM, analiza
+                liczby i daty według języka, eksport Markdown, tłumaczenie dokumentu,
+                wykrywanie prompt injection, historia; częściowo współdzielona z backendem
+worker/src/     backend: router HTTP, CORS, limity, prompty, klient LLM, analiza, tłumaczenie
 ```
 
 ### Decyzje
@@ -55,6 +65,10 @@ worker/src/     backend: router HTTP, CORS, limity, prompty, klient LLM, analiza
 - **Pokrycie analizy jest jawne.** Gdy część stron nie mogła zostać odczytana (np. skany ponad limit), model dostaje o tym informację, wynik zawiera `analysis.unreadPages`, a widok pokazuje np. „Przeanalizowano: 4 z 150 stron”. Częściowa analiza nigdy nie wygląda na pełną.
 - **Pola formularzy.** Wartości wypełnionych pól AcroForm nie należą do warstwy tekstowej strony, więc są odczytywane osobno (`src/lib/forms.ts`) i dołączane do tekstu jako „[Pola formularza]”.
 - **Czyszczenie tekstu.** Ligatury (ﬁ → fi), twarde i wąskie spacje, miękkie łączniki, znaki zerowej szerokości, znaki sterujące kierunkiem tekstu i znaki kontrolne są normalizowane przed wysłaniem do modelu i przed heurystykami.
+- **Przecinek i kropka.** Po polsku „184 500,00” i „12,345 zł” (dwanaście złotych z groszami), po angielsku „184,500.00” i „12,345” (dwanaście tysięcy). `src/lib/localeNumbers.ts` czyta liczby według stylu zapisu wykrytego z samego tekstu (język z modelu jest tylko podpowiedzią). Używają tego: sprawdzanie kwot w tekście (wcześniej oba zapisy były akceptowane naraz, więc błąd o czynnik 1000 przechodził jako „znaleziony”), kontrola tłumaczeń i formatowanie w widoku: „184 500,00 zł” w treści polskiej, „PLN 184,500.00” w angielskiej (`en-GB`, czyli także „12 March 2026” bez dwuznaczności dzień/miesiąc).
+- **Tłumaczenie nie może zmienić wartości.** Do modelu trafiają wyłącznie teksty (tytuł, podsumowanie, punkty, opisy kwot i dat, słowa kluczowe, ostrzeżenia). Liczby, waluty, daty, nazwy podmiotów i pola techniczne JSON są kopiowane z oryginału. Liczby zapisane w samych tekstach są porównywane z oryginałem pole po polu: brakujące, dodane i zapisane w złej notacji (np. „184 500,00” albo „99,5%” w tekście angielskim). Problem oznacza jedną ponowną próbę z listą błędów; jeśli zostanie, tłumaczenie jest zwracane z `analysis.translation.numbersVerified: false` i listą problemów, widoczną w interfejsie i w eksporcie. Inna liczba elementów list niż w oryginale odrzuca tłumaczenie.
+- **Tłumaczenie całego dokumentu** idzie fragmentami (do 12 tys. znaków i 2 skanów na żądanie, łącznie do 120 tys. znaków), sekwencyjnie, z paskiem postępu i możliwością anulowania. Przy limicie zapytań klient czeka tyle, ile wskazał serwer, i wznawia. Liczby i daty są porównywane strona po stronie; strony ze skanu są tłumaczone z obrazu i oznaczone jako niesprawdzone. Wynik to `.md` ze stronami i raportem kontroli.
+- **Język interfejsu i język treści są rozdzielone.** Nagłówki i przyciski są w języku interfejsu, treść dokumentu (i zapis liczb w niej) w języku treści, a pobrane pliki w całości w języku eksportu. Błędy są przekazywane jako kody, a tekst powstaje w interfejsie, więc komunikaty backendu też są w wybranym języku. Domyślnie polski, bo brief wymaga komunikatów po polsku.
 - **Ten sam plik nie jest analizowany dwa razy.** Wynik w historii jest powiązany z SHA-256 pliku; ponowne wgranie identycznego pliku pokazuje zapisany wynik (z przyciskiem „Przeanalizuj ten plik ponownie”), co oszczędza darmowy limit API.
 - **Walidacja jest ścisła tam, gdzie brief stawia twarde reguły:** język ISO 639-1, waluta z listy ISO 4217, prawdziwa data kalendarzowa ISO 8601, 3–7 punktów, 3–5 zdań (licznik zdań z obsługą polskich skrótów i inicjałów). Drobne różnice formatu (np. `zł` zamiast `PLN`, liczba jako tekst) są normalizowane przed walidacją, ale treść nie jest zgadywana.
 - **Skany przez model multimodalny zamiast Tesseract.** Strona bez użytecznej warstwy tekstowej jest renderowana do JPEG i wysyłana razem z tekstem. Za skan uznajemy stronę z mniej niż 30 znakami tekstu albo stronę z obrazem i mniej niż 400 znakami (skan z dodanym nagłówkiem lub pieczątką archiwum, którego sam próg znaków nie wyłapie). Przy limicie 4 obrazów pierwszeństwo mają strony z najmniejszą ilością tekstu. Puste strony są pomijane (pusty obraz zachęca model do zmyślania). Z aplikacją publikowane są dekodery WASM pdf.js (JPEG 2000, JBIG2), bez których typowe skany archiwalne renderują się na biało. Gemini czyta polski tekst ze skanu lepiej niż Tesseract w przeglądarce i nie trzeba pobierać ok. 10 MB danych językowych. W testowej umowie to właśnie skan (Załącznik 5, aneks) zmienia abonament i liczbę użytkowników.
@@ -69,7 +83,8 @@ worker/src/     backend: router HTTP, CORS, limity, prompty, klient LLM, analiza
 - Limity: 10 MB na plik (frontend), 4 MB na żądanie, 400 tys. znaków tekstu, maks. 4 obrazy po 600 tys. znaków base64, 10 analiz na minutę na adres IP (binding Cloudflare Rate Limiting plus limit w pamięci jako druga warstwa). Rozmiar żądania jest dobrany tak, żeby parsowanie i walidacja najgorszego przypadku zajmowały kilka ms CPU (darmowy plan Workers ma 10 ms na żądanie).
 - Content-Security-Policy (jako `<meta>`, bo GitHub Pages nie ustawia nagłówków): skrypty i fonty tylko z własnej domeny, połączenia tylko do własnej domeny i API, bez `eval` (jedynie `wasm-unsafe-eval` dla dekoderów pdf.js). Fonty są serwowane lokalnie, bez zapytań do Google Fonts.
 - Analiza ma budżet 100 s po stronie backendu (klient czeka 120 s), więc Worker nie zużywa limitu API po tym, jak przeglądarka przestała czekać. Treść błędów dostawcy AI trafia tylko do logów Workera.
-- **Prompt injection.** Treść PDF to dane, nie instrukcje:
+- **Eksport Markdown jest escapowany:** tekst z PDF nie może wstawić do pobranego pliku linku, obrazka ładowanego z cudzego serwera ani HTML.
+- **Prompt injection.** Treść PDF to dane, nie instrukcje (także przy tłumaczeniu, które używa tej samej izolacji treści):
   - wszystkie instrukcje są w wiadomości systemowej, a treść dokumentu trafia do modelu w bloku `<document_NONCE>` z losowym znacznikiem, którego dokument nie zna i nie może zamknąć (znaczniki w treści są neutralizowane);
   - nazwa pliku (też kontrolowana przez użytkownika) w ogóle nie trafia do modelu;
   - model ma jawnie zakazane wykonywanie poleceń z dokumentu i ma je zgłosić w ostrzeżeniach;
@@ -116,40 +131,47 @@ Pozostałe polecenia: `npm run lint`, `npm run typecheck`, `npm test`, `npm run 
 
 ## Testy
 
-**Vitest, 89 testów jednostkowych:**
+**Vitest, 120 testów jednostkowych:**
 
 - `src/lib/schema.test.ts`: walidacja schematu (wymagane pola, ISO 8601, ISO 4217, ISO 639-1, liczba zdań i punktów, dodatkowe pola) i żądania (limity, powtórzone strony, obrazy dla nieistniejących stron);
+- `src/lib/localeNumbers.test.ts`: przecinek i kropka dziesiętna (PL/EN), daty polskie, angielskie i ISO, wykrywanie stylu zapisu, porównanie liczb między oryginałem a tłumaczeniem;
 - `src/lib/text.test.ts`: licznik zdań, składanie i czyszczenie tekstu z pdf.js (strony obrócone, ligatury, znaki ukryte), wykrywanie prompt injection, podział na fragmenty, łączenie wyników, zakresy stron;
 - `src/lib/scan.test.ts`: wybór stron do odczytu ze skanu, wykrywanie pustych stron, skala renderowania;
 - `src/lib/forms.test.ts`: wartości pól formularzy;
-- `src/lib/grounding.test.ts`: odnajdywanie kwot i dat w tekście (zapisy PL/EN, mnożniki, kolumny tabel);
-- `src/lib/history.test.ts`: historia w `localStorage` (limit, uszkodzone dane, zgodność wstecz, ten sam plik);
+- `src/lib/grounding.test.ts`: odnajdywanie kwot i dat w tekście według stylu zapisu (także błąd o czynnik 1000);
+- `src/lib/exports.test.ts`: formatowanie kwot i dat PL/EN, eksport `.md` (polski i angielski, escapowanie), podział dokumentu na fragmenty, wznawianie po limicie zapytań, zgodność słowników PL/EN;
+- `src/lib/history.test.ts`: historia w `localStorage` (limit, uszkodzone dane, zgodność wstecz, ten sam plik, wersja potoku);
 - `src/api/analyze.test.ts`: limit czasu i anulowanie żądania;
-- `worker/src/worker.test.ts`: analiza z atrapą LLM (ponowienie po błędnej odpowiedzi, błąd po drugiej próbie, map-reduce, części bez pełnego podsumowania, obrazy skanów, izolacja treści i nazwy pliku, pokrycie, sprawdzanie kwot i dat, HTTP 429, budżet czasu, odmowy i ucięte odpowiedzi Gemini, ukrywanie błędów dostawcy, normalizacja formatów), CORS, limit rozmiaru i liczby żądań.
+- `worker/src/worker.test.ts`: analiza z atrapą LLM (ponowienie, map-reduce, części bez pełnego podsumowania, skany, izolacja treści i nazwy pliku, pokrycie, sprawdzanie kwot i dat, HTTP 429, budżet czasu, odmowy i ucięte odpowiedzi, normalizacja formatów), CORS, limity;
+- `worker/src/translate.test.ts`: tłumaczenie wyniku (wartości z oryginału, poprawka polskiego zapisu liczb w tekście angielskim, jawne oznaczenie niezgodności, odrzucenie innej struktury) i dokumentu (kontrola liczb na stronach, pomijanie skanów), walidacja endpointów.
 
-**Playwright, 13 testów E2E** (`e2e/`, uruchamiane w CI przed wdrożeniem): zbudowana aplikacja w Chromium, backend mockowany przez `page.route`, a każde żądanie wysłane przez frontend jest walidowane schematem. Pliki w `e2e/fixtures/` (z generatorem `generate.py`) odtwarzają przypadki, które kiedyś powodowały błędy: skan z nagłówkiem tekstowym, skan JPEG 2000, wypełniony formularz, pusta strona, PDF z hasłem, HTML z rozszerzeniem .pdf. Testy sprawdzają też pobranie JSON, ponowienie po błędzie API, odrzucenie odpowiedzi niezgodnej ze schematem, wynik z historii dla tego samego pliku, układ przy 360 px i brak naruszeń CSP. Sprawdziłem, że testy faktycznie łapią regresje: po celowym przywróceniu dwóch naprawionych błędów odpowiednie testy nie przechodzą.
+**Playwright, 18 testów E2E** (`e2e/`, uruchamiane w CI przed wdrożeniem): zbudowana aplikacja w Chromium, backend mockowany przez `page.route`, a każde żądanie wysłane przez frontend jest walidowane schematem. Pliki w `e2e/fixtures/` (z generatorem `generate.py`) odtwarzają przypadki, które kiedyś powodowały błędy: skan z nagłówkiem tekstowym, skan JPEG 2000, wypełniony formularz, pusta strona, PDF z hasłem, HTML z rozszerzeniem .pdf. Testy sprawdzają też pobranie JSON, przełącznik PL/EN (zapamiętany po przeładowaniu), wynik po angielsku z angielskim zapisem liczb i pobraniem JSON oraz `.md` w obu językach, tłumaczenie z historii bez nowego zapytania, oznaczenie niezgodnych liczb, tłumaczenie całego dokumentu, komunikaty błędów w języku interfejsu, ponowienie po błędzie API, odrzucenie odpowiedzi niezgodnej ze schematem, wynik z historii dla tego samego pliku, układ przy 360 px i brak naruszeń CSP. Sprawdziłem, że testy faktycznie łapią regresje: po celowym przywróceniu dwóch naprawionych błędów odpowiednie testy nie przechodzą.
 
 ### Przypadki brzegowe sprawdzone w przeglądarce
 
 Każdy plik przeszedł przez prawdziwy interfejs w headless Chromium (z atrapą modelu AI):
 
-| Plik                                                              | Wynik                                                                          |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Umowa testowa (12 stron, ukryta instrukcja 5 pt, aneks jako skan) | tekst 11 stron, strona 11 wysłana jako obraz, ostrzeżenie o stronie 4          |
-| Skan z dodanym nagłówkiem tekstowym                               | rozpoznany jako skan i odczytany (wcześniej treść ginęła)                      |
-| Skan zapisany w JPEG 2000                                         | poprawnie zdekodowany (wcześniej biała strona)                                 |
-| 6 stron skanów                                                    | 4 odczytane, ostrzeżenie o stronach 5 i 6                                      |
-| Pusta strona                                                      | komunikat „W pliku nie ma tekstu do analizy” zamiast pustego obrazu dla modelu |
-| Paragon 200 × 14 000 pt                                           | render ograniczony do 4 mln pikseli (bez przekroczenia limitu canvas)          |
-| PDF z hasłem / uszkodzony / 11 MB / HTML z rozszerzeniem .pdf     | czytelny komunikat, bez przycisku ponowienia                                   |
-| Biały tekst „Ignore all previous instructions”                    | ostrzeżenie dla użytkownika                                                    |
-| Wypełniony formularz (kwota i data tylko w polach)                | wartości pól trafiają do analizy (wcześniej ginęły)                            |
-| 150 stron skanów z nagłówkiem                                     | „Przeanalizowano: 4 z 150 stron”, ostrzeżenie „Strony 5–150 …”                 |
-| 700 stron tekstu (ponad limit)                                    | przerwanie odczytu na stronie 539 z czytelnym komunikatem                      |
-| Wynik modelu z kwotami spoza dokumentu                            | pozycje oznaczone „nie znaleziono w tekście” i wymienione w ostrzeżeniu        |
-| Tryb ciemny, audyt axe-core                                       | brak naruszeń dostępności, kontrast poprawny w obu motywach                    |
-| Szerokość 360 px                                                  | brak poziomego przewijania                                                     |
-| CSP                                                               | brak naruszeń w konsoli                                                        |
+| Plik                                                               | Wynik                                                                          |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| Umowa testowa (12 stron, ukryta instrukcja 5 pt, aneks jako skan)  | tekst 11 stron, strona 11 wysłana jako obraz, ostrzeżenie o stronie 4          |
+| Skan z dodanym nagłówkiem tekstowym                                | rozpoznany jako skan i odczytany (wcześniej treść ginęła)                      |
+| Skan zapisany w JPEG 2000                                          | poprawnie zdekodowany (wcześniej biała strona)                                 |
+| 6 stron skanów                                                     | 4 odczytane, ostrzeżenie o stronach 5 i 6                                      |
+| Pusta strona                                                       | komunikat „W pliku nie ma tekstu do analizy” zamiast pustego obrazu dla modelu |
+| Paragon 200 × 14 000 pt                                            | render ograniczony do 4 mln pikseli (bez przekroczenia limitu canvas)          |
+| PDF z hasłem / uszkodzony / 11 MB / HTML z rozszerzeniem .pdf      | czytelny komunikat, bez przycisku ponowienia                                   |
+| Biały tekst „Ignore all previous instructions”                     | ostrzeżenie dla użytkownika                                                    |
+| Wypełniony formularz (kwota i data tylko w polach)                 | wartości pól trafiają do analizy (wcześniej ginęły)                            |
+| 150 stron skanów z nagłówkiem                                      | „Przeanalizowano: 4 z 150 stron”, ostrzeżenie „Strony 5–150 …”                 |
+| 700 stron tekstu (ponad limit)                                     | przerwanie odczytu na stronie 539 z czytelnym komunikatem                      |
+| Wynik modelu z kwotami spoza dokumentu                             | pozycje oznaczone „nie znaleziono w tekście” i wymienione w ostrzeżeniu        |
+| Tryb ciemny, audyt axe-core                                        | brak naruszeń dostępności, kontrast poprawny w obu motywach                    |
+| Szerokość 360 px                                                   | brak poziomego przewijania                                                     |
+| CSP                                                                | brak naruszeń w konsoli                                                        |
+| Polski tekst „12,345 zł”, model podaje 12 345                      | oznaczone „nie znaleziono w tekście” (wcześniej przechodziło)                  |
+| Wynik po angielsku (pełny stos: frontend, Worker, atrapa modelu)   | „PLN 184,500.00” zamiast „184 500,00 zł”, kontrola liczb potwierdzona          |
+| Tłumaczenie dokumentu z polskim zapisem liczb w tekście angielskim | raport „wrong notation” na każdej takiej stronie, bez fałszywych różnic        |
+| Interfejs EN, tryb ciemny, 360 px                                  | brak naruszeń axe-core i poziomego przewijania                                 |
 
 ## Znane ograniczenia
 
@@ -158,6 +180,8 @@ Każdy plik przeszedł przez prawdziwy interfejs w headless Chromium (z atrapą 
 - **Bardzo długie strony** (np. paragony) są renderowane w niższej rozdzielczości; drobny tekst może być nieczytelny dla modelu. Lepsze byłoby cięcie strony na kafelki.
 - **Ukryty tekst** (biały, mikroskopijny, poza stroną) nie jest osobno wykrywany. Trafia do modelu jako dane i jest sygnalizowany tylko wtedy, gdy wygląda na polecenie. Homoglify (np. cyrylickie „о” w „ignоre”) omijają heurystykę.
 - **Sprawdzanie w tekście dotyczy tylko kwot i dat.** Nazwy osób i firm nie są sprawdzane, bo w polskim tekście występują w odmianie („Annę Kowalczyk”), a model podaje mianownik. Kwota wyliczona przez model (np. suma rat) zostanie oznaczona jako nieznaleziona, choć może być poprawna.
+- **Tłumaczenie:** docelowo angielski (dla dokumentów angielskich polski). Cały dokument do 120 tys. znaków; przy darmowym limicie API trwa to do kilku minut. Liczby zapisane słownie („pięć etapów”) nie są porównywane, a strony ze skanu są tłumaczone z obrazu bez porównania liczb. Tłumaczenie całego dokumentu nie jest zapisywane w historii (tylko tłumaczenie wyniku); po otwarciu wyniku z historii trzeba wgrać plik ponownie.
+- **Wartości `document.type`** pozostają w JSON po polsku (`umowa`, `faktura`), także w wersji angielskiej, bo są wartościami schematu z briefu; w interfejsie mają etykiety w obu językach.
 - **Pola formularzy XFA** (formularze dynamiczne) nie są obsługiwane; pdf.js odczytuje tylko AcroForm.
 - **Prywatność:** demo działa na darmowym planie Gemini API, w którym Google może wykorzystywać przesłane treści do ulepszania usług. Aplikacja ostrzega o tym użytkownika; do dokumentów poufnych potrzebny byłby plan płatny.
 - **Darmowy limit Gemini** (kilka–kilkanaście zapytań na minutę) przy wielu użytkownikach naraz kończy się komunikatem „spróbuj ponownie za minutę” (po jednej automatycznej próbie z odczekaniem). Długi dokument zużywa do 4 zapytań.
