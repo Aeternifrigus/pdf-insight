@@ -42,8 +42,9 @@ Przeglądarka (React SPA, GitHub Pages)          Cloudflare Worker (API proxy)  
 │ 2. pdf.js: tekst każdej strony    │ ────────▶ │ limit żądań (10/min/IP) i rozmiaru│ ─────▶ │ LLM (JSON) │
 │ 3. strony bez tekstu → JPEG       │  tekst +  │ walidacja żądania (Zod)           │        │            │
 │ 4. walidacja wyniku (Zod)         │  obrazy   │ prompt: treść PDF = dane          │ ◀───── │            │
-│ 5. widok, JSON, historia          │ ◀──────── │ walidacja odpowiedzi + 1 ponowienie│        └────────────┘
-└──────────────────────────────────┘   JSON    └──────────────────────────────────┘
+│ 5. kontrole wartości i poleceń AI │ ◀──────── │ walidacja odpowiedzi + 1 ponowienie│        └────────────┘
+│ 6. widok, JSON, historia          │   JSON    │ (ok. 1 ms CPU na żądanie)          │
+└──────────────────────────────────┘           └──────────────────────────────────┘
 ```
 
 Endpointy: `POST /analyze` (analiza), `POST /translate` (tłumaczenie wyniku), `POST /translate-document` (jeden fragment dokumentu do tłumaczenia), `GET /health`. Analiza i tłumaczenie mają osobne limity żądań.
@@ -63,11 +64,13 @@ worker/src/     backend: router HTTP, CORS, limity, prompty, klient LLM, analiza
 
 ### Decyzje
 
+- **Backend jest cienki, kontrole działają w przeglądarce.** Worker robi tylko to, co wymaga klucza API: walidacja żądania, prompt, wywołanie modelu, walidacja odpowiedzi. Kontrole deterministyczne (sprawdzanie kwot i dat w tekście, heurystyka poleceń dla AI, `src/lib/verify.ts`) działają w przeglądarce, która ma już tekst dokumentu. Powód jest mierzalny: darmowy plan Cloudflare daje ok. 10 ms CPU na żądanie, a te kontrole w Workerze zajmowały ok. 45 ms na umowie testowej (przekroczenie kończy się błędem 1102). Po przeniesieniu `/analyze` zajmuje ok. 1 ms (5 ms w najgorszym przypadku), a kontrole ok. 7 ms w przeglądarce.
+- **Co jest ważne w dokumencie** (`IMPORTANCE_RULES` w `worker/src/prompt.ts`). Ważność ocenia model, ale według jawnej kolejności, wspólnej dla analizy, łączenia części długiego dokumentu i ponownej próby: 1) tożsamość dokumentu (typ, numer, strony i ich role, data zawarcia), 2) pieniądze definiujące umowę (wartość główna, opłaty cykliczne z okresem, netto i brutto, waluta oryginalna), 3) czas (początek i koniec obowiązywania, terminy płatności, kamienie milowe), 4) zmiany z aneksów i korekt (nowa wartość jest aktualna; podawana razem ze starą i datą obowiązywania), 5) zobowiązania i ryzyka (kary i ich limity, SLA, wypowiedzenie), 6) reszta (pojedyncze pozycje cennika, statystyki, listy zadań). Dla każdego typu dokumentu jest lista faktów, których nie wolno pominąć (np. dla umowy: strony, przedmiot, okres, wartość i opłaty, płatności, kary, wypowiedzenie, aneksy). Tekst wyglądający na polecenie dla AI nigdy nie jest ważną treścią. Przy długich listach (np. cennik) obcinane są pozycje z końca tej kolejności. Kod pilnuje tylko limitów (3–7 punktów, maks. 15 słów kluczowych) i sortuje daty chronologicznie. Wcześniej prompt mówił tylko „najważniejsze” bez definicji, więc model mógł pominąć np. okres obowiązywania umowy; sprawdzarka faktów z `eval/` używa tych samych kryteriów jako „wymaganych”.
 - **Cloudflare Workers jako backend.** Darmowy plan wystarcza z dużym zapasem, nie usypia się jak darmowe serwery, a klucz API trzymany jest jako sekret Workera (`wrangler secret put`). Frontend zna tylko publiczny adres API.
 - **PDF nie opuszcza przeglądarki.** Tekst wyciąga pdf.js po stronie klienta, a do backendu trafia wyłącznie tekst stron i obrazy stron zeskanowanych. Dzięki temu żądania są małe, a limit 10 MB dotyczy pliku, nie transferu.
 - **Jeden schemat Zod dla frontendu i backendu** (`src/lib/schema.ts`). Backend waliduje odpowiedź modelu i przy błędzie robi dokładnie jedną ponowną próbę, przekazując modelowi listę błędów. Frontend waliduje wynik ponownie przed wyświetleniem i nie ufa ślepo backendowi.
 - **Pola wyliczane deterministycznie nie pochodzą od modelu.** `fileName` i `pages` ustawia kod, model nie może ich zmienić. Dodane pole `analysis` (model, data, liczba fragmentów, strony ze skanu, strony nieodczytane, ostrzeżenia) jest dozwolone przez brief („pola można dodawać”).
-- **Kwoty i daty są sprawdzane w tekście dokumentu** (bez AI, `src/lib/grounding.ts`), zarówno na listach `amounts`/`dates`, jak i w podsumowaniu i najważniejszych punktach. Każda pozycja dostaje dodatkowe pole `foundInText`: `true` (występuje w tekście, w dowolnym typowym zapisie: „184 500,00”, „1,234.56”, „4,2 mln”, „12.03.2026”, „12 marca 2026”, także przełamana między wierszami), `false` (z powodem w polu `issue`) albo `null` (nie da się sprawdzić, bo część treści pochodzi ze skanów). Powody:
+- **Kwoty i daty są sprawdzane w tekście dokumentu** (bez AI, w przeglądarce, `src/lib/grounding.ts` i `src/lib/verify.ts`), zarówno na listach `amounts`/`dates`, jak i w podsumowaniu i najważniejszych punktach. Każda pozycja dostaje dodatkowe pole `foundInText`: `true` (występuje w tekście, w dowolnym typowym zapisie: „184 500,00”, „1,234.56”, „4,2 mln”, „12.03.2026”, „12 marca 2026”, także przełamana między wierszami), `false` (z powodem w polu `issue`) albo `null` (nie da się sprawdzić, bo część treści pochodzi ze skanów). Powody:
   - `fromInstruction`: wartość występuje w dokumencie **tylko w tekście wyglądającym na polecenie dla AI** (np. „1 PLN” z ukrytej instrukcji w umowie testowej). Tekst polecenia jest wyłączony z dowodów; wcześniej kontrola uznawała taką wartość za „znalezioną”, czyli potwierdzała skutek ataku;
   - `currencyMismatch`: wartość występuje w dokumencie tylko z inną walutą (np. 8 600 EUR podane jako PLN);
   - `notInText`: wartości nie ma w tekście (możliwe zmyślenie albo wartość wyliczona przez model).
@@ -90,7 +93,7 @@ worker/src/     backend: router HTTP, CORS, limity, prompty, klient LLM, analiza
 
 - Klucz API istnieje tylko jako sekret Cloudflare (`GEMINI_API_KEY`). W repozytorium jest wyłącznie `.env.example` i `worker/.dev.vars.example`; `.env` i `.dev.vars` są w `.gitignore`.
 - CORS: backend odpowiada tylko originom z `ALLOWED_ORIGINS`: w produkcji wyłącznie `https://aeternifrigus.github.io` (localhost tylko lokalnie, przez `worker/.dev.vars`). Żądania z przeglądarki z innej domeny dostają 403.
-- Limity: 10 MB na plik (frontend), 4 MB na żądanie, 400 tys. znaków tekstu, maks. 4 obrazy po 600 tys. znaków base64, 10 analiz na minutę na adres IP (binding Cloudflare Rate Limiting plus limit w pamięci jako druga warstwa). Rozmiar żądania jest dobrany tak, żeby parsowanie i walidacja najgorszego przypadku zajmowały kilka ms CPU (darmowy plan Workers ma 10 ms na żądanie).
+- Limity: 10 MB na plik (frontend), 4 MB na żądanie, 400 tys. znaków tekstu, maks. 4 obrazy po 600 tys. znaków base64, 10 analiz na minutę na adres IP (binding Cloudflare Rate Limiting plus limit w pamięci jako druga warstwa). Rozmiar żądania i podział pracy są dobrane pod limit CPU darmowego planu Workers (ok. 10 ms na żądanie): zmierzone ok. 1 ms dla umowy testowej i ok. 5 ms dla najdłuższego dozwolonego dokumentu.
 - Content-Security-Policy (jako `<meta>`, bo GitHub Pages nie ustawia nagłówków): skrypty i fonty tylko z własnej domeny, połączenia tylko do własnej domeny i API, bez `eval` (jedynie `wasm-unsafe-eval` dla dekoderów pdf.js). Fonty są serwowane lokalnie, bez zapytań do Google Fonts.
 - Analiza ma budżet 100 s po stronie backendu (klient czeka 120 s), więc Worker nie zużywa limitu API po tym, jak przeglądarka przestała czekać. Treść błędów dostawcy AI trafia tylko do logów Workera.
 - **Eksport Markdown jest escapowany:** tekst z PDF nie może wstawić do pobranego pliku linku, obrazka ładowanego z cudzego serwera ani HTML.
@@ -98,7 +101,7 @@ worker/src/     backend: router HTTP, CORS, limity, prompty, klient LLM, analiza
   - wszystkie instrukcje są w wiadomości systemowej, a treść dokumentu trafia do modelu w bloku `<document_NONCE>` z losowym znacznikiem, którego dokument nie zna i nie może zamknąć (znaczniki w treści są neutralizowane);
   - nazwa pliku (też kontrolowana przez użytkownika) w ogóle nie trafia do modelu;
   - model ma jawnie zakazane wykonywanie poleceń z dokumentu i ma je zgłosić w ostrzeżeniach;
-  - niezależnie od modelu działa heurystyka (PL/EN/DE, odporna na brak polskich znaków), która wykrywa typowe frazy i pokazuje użytkownikowi ostrzeżenie;
+  - niezależnie od modelu w przeglądarce działa heurystyka (PL/EN/DE, odporna na brak polskich znaków), która wykrywa typowe frazy i pokazuje użytkownikowi ostrzeżenie;
   - wynik jest ściśle walidowany schematem i renderowany wyłącznie jako tekst (bez `dangerouslySetInnerHTML`, reguła ESLint to wymusza).
     Testowa umowa zawiera ukrytą instrukcję (strona 4, tekst 5 pt), która każe napisać, że umowa jest nieważna i warta 1 PLN. Model ma ją zignorować, użytkownik dostaje ostrzeżenie, a jeśli wynik mimo to zawiera wartość z polecenia (np. 1 PLN w kwotach lub w podsumowaniu), jest ona oznaczona jako możliwa manipulacja. Ostrzeżenie nie twierdzi, że polecenie „nie zostało wykonane”, bo kod nie może tego zagwarantować.
 - Użytkownik widzi informację, że treść pliku trafia do zewnętrznego API AI (przy polu wgrywania i w stopce).
@@ -164,25 +167,27 @@ Pozostałe polecenia: `npm run lint`, `npm run typecheck`, `npm test`, `npm run 
 
 ### Zmienne środowiskowe
 
-| Zmienna                    | Gdzie                                               | Opis                                                                 |
-| -------------------------- | --------------------------------------------------- | -------------------------------------------------------------------- |
-| `VITE_API_URL`             | frontend (`.env.local`, w CI: zmienna repozytorium) | adres Workera, bez końcowego `/`                                     |
-| `VITE_BASE_PATH`           | frontend (ustawiane w CI)                           | ścieżka GitHub Pages, domyślnie `/pdf-insight/`                      |
-| `GEMINI_API_KEY`           | Worker, sekret                                      | klucz Google AI Studio                                               |
-| `GEMINI_MODEL`             | Worker, `wrangler.toml`                             | domyślnie `gemini-2.5-flash`                                         |
-| `ALLOWED_ORIGINS`          | Worker, `wrangler.toml` (lokalnie `.dev.vars`)      | dozwolone originy, oddzielone przecinkami; w produkcji bez localhost |
-| `LLM_PROVIDER`, `OPENAI_*` | Worker                                              | opcjonalnie dowolne API zgodne z OpenAI (np. Groq) zamiast Gemini    |
+| Zmienna                    | Gdzie                                               | Opis                                                                          |
+| -------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `VITE_API_URL`             | frontend (`.env.local`, w CI: zmienna repozytorium) | adres Workera, bez końcowego `/`                                              |
+| `VITE_BASE_PATH`           | frontend (ustawiane w CI)                           | ścieżka GitHub Pages, domyślnie `/pdf-insight/`                               |
+| `GEMINI_API_KEY`           | Worker, sekret                                      | klucz Google AI Studio                                                        |
+| `GEMINI_MODEL`             | Worker, `wrangler.toml`                             | domyślnie `gemini-3.8-flash` (przy niskich limitach: `gemini-3.5-flash-lite`) |
+| `ALLOWED_ORIGINS`          | Worker, `wrangler.toml` (lokalnie `.dev.vars`)      | dozwolone originy, oddzielone przecinkami; w produkcji bez localhost          |
+| `LLM_PROVIDER`, `OPENAI_*` | Worker                                              | opcjonalnie dowolne API zgodne z OpenAI (np. Groq) zamiast Gemini             |
 
 ## Wdrożenie
 
 1. **Backend:** `npx wrangler login`, potem `npx wrangler secret put GEMINI_API_KEY --config worker/wrangler.toml` i `npm run deploy:worker`. Wrangler wypisze adres `https://pdf-insight-api.<konto>.workers.dev`.
 2. **Frontend:** w repozytorium GitHub ustaw _Settings → Pages → Source: GitHub Actions_ oraz zmienną _Settings → Secrets and variables → Actions → Variables → `VITE_API_URL`_. Każdy push do `main` uruchamia `lint → build → deploy`.
 3. Opcjonalnie: sekrety `CLOUDFLARE_API_TOKEN` i `CLOUDFLARE_ACCOUNT_ID` włączają automatyczny deploy Workera (`.github/workflows/worker.yml`).
-4. **Sprawdzenie wyniku prawdziwego modelu:** w demo wgraj plik testowy, pobierz JSON i uruchom sprawdzarkę faktów (sekcja „Kontrola jakości wyników AI”).
+4. **Jeśli wdrożenie Workera odrzuci blok `[[ratelimits]]`** (binding niedostępny na koncie), usuń oba bloki z `wrangler.toml`: limit żądań w pamięci Workera nadal działa.
+5. **Model:** `gemini-2.5-flash` nie jest już dostępny dla nowych projektów, dlatego domyślny jest `gemini-3.8-flash`. Limity darmowego planu sprawdzisz w Google AI Studio (Rate limits); przy ich wyczerpaniu ustaw `GEMINI_MODEL = "gemini-3.5-flash-lite"`.
+6. **Sprawdzenie wyniku prawdziwego modelu:** w demo wgraj plik testowy, pobierz JSON i uruchom sprawdzarkę faktów (sekcja „Kontrola jakości wyników AI”).
 
 ## Testy
 
-**Vitest, 140 testów jednostkowych** (plus testy `eval/`, uruchamiane po podaniu pliku):
+**Vitest, 145 testów jednostkowych** (plus testy `eval/`, uruchamiane po podaniu pliku):
 
 - `src/lib/schema.test.ts`: walidacja schematu (wymagane pola, ISO 8601, ISO 4217, ISO 639-1, liczba zdań i punktów, dodatkowe pola) i żądania (limity, powtórzone strony, obrazy dla nieistniejących stron);
 - `src/lib/localeNumbers.test.ts`: przecinek i kropka dziesiętna (PL/EN), daty polskie, angielskie i ISO, wykrywanie stylu zapisu, porównanie liczb między oryginałem a tłumaczeniem;
@@ -198,7 +203,7 @@ Pozostałe polecenia: `npm run lint`, `npm run typecheck`, `npm test`, `npm run 
 - `worker/src/worker.test.ts`: analiza z atrapą LLM (ponowienie, map-reduce, części bez pełnego podsumowania, skany, izolacja treści i nazwy pliku, pokrycie, sprawdzanie kwot i dat, HTTP 429, budżet czasu, odmowy i ucięte odpowiedzi, normalizacja formatów), CORS, limity;
 - `worker/src/translate.test.ts`: tłumaczenie wyniku (wartości z oryginału, poprawka polskiego zapisu liczb w tekście angielskim, jawne oznaczenie niezgodności, odrzucenie innej struktury) i dokumentu (kontrola liczb na stronach, pomijanie skanów), walidacja endpointów.
 
-**Playwright, 19 testów E2E** (`e2e/`, uruchamiane w CI przed wdrożeniem): zbudowana aplikacja w Chromium, backend mockowany przez `page.route`, a każde żądanie wysłane przez frontend jest walidowane schematem. Pliki w `e2e/fixtures/` (z generatorem `generate.py`) odtwarzają przypadki, które kiedyś powodowały błędy: skan z nagłówkiem tekstowym, skan JPEG 2000, wypełniony formularz, pusta strona, PDF z hasłem, HTML z rozszerzeniem .pdf. Testy sprawdzają też pobranie JSON, przełącznik PL/EN (zapamiętany po przeładowaniu), wynik po angielsku z angielskim zapisem liczb i pobraniem JSON oraz `.md` w obu językach, tłumaczenie z historii bez nowego zapytania, oznaczenie niezgodnych liczb, tłumaczenie całego dokumentu, komunikaty błędów w języku interfejsu, ponowienie po błędzie API, odrzucenie odpowiedzi niezgodnej ze schematem, wynik z historii dla tego samego pliku, układ przy 360 px i brak naruszeń CSP. Sprawdziłem, że testy faktycznie łapią regresje: po celowym przywróceniu dwóch naprawionych błędów odpowiednie testy nie przechodzą.
+**Playwright, 20 testów E2E** (`e2e/`, uruchamiane w CI przed wdrożeniem): zbudowana aplikacja w Chromium, backend mockowany przez `page.route`, a każde żądanie wysłane przez frontend jest walidowane schematem. Pliki w `e2e/fixtures/` (z generatorem `generate.py`) odtwarzają przypadki, które kiedyś powodowały błędy: skan z nagłówkiem tekstowym, skan JPEG 2000, wypełniony formularz, pusta strona, PDF z hasłem, HTML z rozszerzeniem .pdf. Testy sprawdzają też pobranie JSON, przełącznik PL/EN (zapamiętany po przeładowaniu), wynik po angielsku z angielskim zapisem liczb i pobraniem JSON oraz `.md` w obu językach, tłumaczenie z historii bez nowego zapytania, oznaczenie niezgodnych liczb, tłumaczenie całego dokumentu, komunikaty błędów w języku interfejsu, ponowienie po błędzie API, odrzucenie odpowiedzi niezgodnej ze schematem, wynik z historii dla tego samego pliku, układ przy 360 px i brak naruszeń CSP. Sprawdziłem, że testy faktycznie łapią regresje: po celowym przywróceniu dwóch naprawionych błędów odpowiednie testy nie przechodzą.
 
 ### Przypadki brzegowe sprawdzone w przeglądarce
 

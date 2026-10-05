@@ -3,7 +3,7 @@
 ## Narzędzia
 
 - **Claude (Opus 5.5) w aplikacji Claude**, w trybie z dostępem do terminala i plików: analiza briefu, projekt architektury, implementacja, testy i dokumentacja. Claude uruchamiał komendy (`npm`, `tsc`, `eslint`, `vitest`, `wrangler dev`) i sam sprawdzał wyniki.
-- **Google Gemini 2.5 Flash** jako model używany przez aplikację w produkcji (podsumowanie, ekstrakcja danych, odczyt skanów).
+- **Google Gemini** (domyślnie `gemini-3.8-flash`) jako model używany przez aplikację w produkcji (podsumowanie, ekstrakcja danych, odczyt skanów, tłumaczenie). Pierwotnie `gemini-2.5-flash`, zmieniony w piątym przeglądzie.
 - Do testu end-to-end w przeglądarce użyto lokalnej atrapy API zgodnej z OpenAI (zwraca gotowy JSON), headless Chromium i `wrangler dev`. Dzięki temu cały przepływ (pdf.js, render skanu, Worker, walidacja, UI) został sprawdzony bez zużywania limitów.
 
 ## Kluczowe prompty
@@ -110,7 +110,19 @@ Prompt (pisownia oryginalna): _„check for their must not dos and check legitim
 
 **Autorstwo.** Wszystkie commity mają autora i zatwierdzającego `Aeternifrigus`, bez dopisków o współautorstwie. Udział Claude jest opisany w tym pliku, zgodnie z wymaganiem briefu.
 
+## Piąty przegląd: usterki przed wdrożeniem i logika ważności
+
+Prompt (pisownia oryginalna): _„check again for any faluts and what is the logic of considering what is important in the document. and keep the commits timely and all, I will push the bundle to github right?”_
+
+38. **Przekroczenie limitu CPU Cloudflare (najpoważniejsze).** Pomiar pokazał ok. 45 ms CPU na żądanie dla umowy testowej i ponad 800 ms w najgorszym przypadku, przy limicie ok. 10 ms w darmowym planie (przekroczenie kończy się błędem 1102, czyli demo mogło nie działać właśnie na pliku testowym). Głównym kosztem było dzielenie stron na wiersze z poleceniem dla AI, dodane w czwartym przeglądzie: każdy wiersz był normalizowany kilka razy. Poprawione dwuetapowo: skan tylko stron z dopasowaniem, a kontrole deterministyczne przeniesione do przeglądarki (`src/lib/verify.ts`). `/analyze` zajmuje teraz ok. 1 ms (5 ms w najgorszym przypadku).
+39. **Domyślny model niedostępny dla nowych projektów.** Według strony wycofań Google `gemini-2.5-flash` jest dostępny tylko dla projektów, które już go używały, więc nowy klucz API dostałby błąd przy pierwszej analizie. Domyślny jest teraz `gemini-3.8-flash` (darmowy plan, obsługa obrazów). Generacja 3 zastąpiła `thinkingBudget` ustawieniem `thinkingLevel`, więc ustawienie szybkości jest dobierane do modelu.
+40. **„Najważniejsze” bez definicji.** Prompt prosił o najważniejsze fakty, ale nie mówił, co to znaczy. Teraz kolejność ważności i lista faktów obowiązkowych dla każdego typu dokumentu są jawne (opis w README, „Co jest ważne w dokumencie”).
+41. **Fałszywe kwoty w kontroli wartości.** Porównanie wzorca faktów z tekstem PDF pokazało, że numer pozycji tabeli po „zł” z poprzedniego wiersza był czytany jako „2 zł”, co mogło dawać fałszywe alarmy „inna waluta”. Waluta przed liczbą musi teraz być w tym samym wierszu.
+42. **Sam wzorzec faktów sprawdzony z dokumentem:** każda kwota i data z `eval/facts.ts` występuje w PDF (poza wartościami tylko ze skanu aneksu).
+
+Znaczniki czasu commitów pokazują faktyczny moment zapisu. Pierwsze 11 commitów powstało razem po zbudowaniu pierwszej wersji, więc mają tę samą minutę; nie były sztucznie rozkładane w czasie.
+
 ## Weryfikacja
 
-- `npm run lint`, `npm run typecheck`, `npm test` (140 testów), `npm run test:e2e` (19 testów) i `npm run build` przechodzą bez błędów i ostrzeżeń. `npm run check:facts` z plikiem testowym: 27 sprawdzeń odczytu i kontroli wartości na prawdziwym dokumencie.
+- `npm run lint`, `npm run typecheck`, `npm test` (145 testów), `npm run test:e2e` (20 testów) i `npm run build` przechodzą bez błędów i ostrzeżeń. `npm run check:facts` z plikiem testowym: 27 sprawdzeń odczytu i kontroli wartości na prawdziwym dokumencie.
 - Test end-to-end w headless Chromium na pliku testowym i na nietypowych PDF-ach (tabela w README): odczyt 12 stron, strona 11 wyrenderowana do JPEG i wysłana do modelu, ostrzeżenie o instrukcji ze strony 4, brak poziomego przewijania przy 360 px, pobranie pliku `.json`, historia po przeładowaniu, komunikat błędu dla pliku, który nie jest PDF-em.
