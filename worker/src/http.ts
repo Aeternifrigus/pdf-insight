@@ -14,6 +14,7 @@ export function corsHeaders(origin: string | null, allowed: string[]): Record<st
     headers['Access-Control-Allow-Methods'] = 'POST, GET, OPTIONS';
     headers['Access-Control-Allow-Headers'] = 'Content-Type';
     headers['Access-Control-Max-Age'] = '86400';
+    headers['Access-Control-Expose-Headers'] = 'Retry-After';
   }
   return headers;
 }
@@ -33,8 +34,17 @@ export function json(body: unknown, status: number, extra: Record<string, string
 }
 
 export function errorResponse(err: AppError, extra: Record<string, string> = {}): Response {
+  // Retry-After także w treści: nagłówek z innej domeny jest dla skryptu niewidoczny bez CORS.
+  const retryAfter = Number(extra['Retry-After'] ?? NaN);
   return json(
-    { error: { code: err.code, message: err.message, details: err.details ?? [] } },
+    {
+      error: {
+        code: err.code,
+        message: err.message,
+        details: err.details ?? [],
+        ...(Number.isFinite(retryAfter) ? { retryAfterSeconds: retryAfter } : {}),
+      },
+    },
     err.status,
     extra,
   );

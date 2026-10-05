@@ -1,14 +1,31 @@
+import type { z } from 'zod';
 import type { ExtractedPdf } from '../lib/pdf';
-import { formatIssues, insightSchema, type AnalyzeRequest, type Insight } from '../lib/schema';
+import {
+  formatIssues,
+  insightSchema,
+  translateDocumentResponseSchema,
+  type AnalyzeRequest,
+  type Insight,
+  type OutputLanguage,
+  type TranslateDocumentRequest,
+  type TranslateDocumentResponse,
+} from '../lib/schema';
 
 const API_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
 const TIMEOUT_MS = 120_000;
 
+/**
+ * Błąd API z kodem. Interfejs pokazuje komunikat dla kodu w wybranym języku,
+ * a `message` (tekst z serwera, po polsku) jest tylko zapasowy.
+ */
 export class ApiError extends Error {
   constructor(
+    public readonly code: string,
     message: string,
     public readonly details: string[] = [],
     public readonly retryable = true,
+    public readonly retryAfterSeconds?: number,
+    public readonly status?: number,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -59,16 +76,18 @@ export function buildRequest(fileName: string, pdf: ExtractedPdf): AnalyzeReques
 }
 
 interface ErrorBody {
-  error?: { message?: unknown; details?: unknown };
+  error?: { code?: unknown; message?: unknown; details?: unknown; retryAfterSeconds?: unknown };
 }
 
-export async function analyze(request: AnalyzeRequest, signal: AbortSignal): Promise<Insight> {
+/** Wspólne wywołanie API: limit czasu, kody błędów i walidacja odpowiedzi schematem. */
+async function post<S extends z.ZodType>(
+  path: string,
+  payload: unknown,
+  schema: S,
+  signal: AbortSignal,
+): Promise<z.infer<S>> {
   if (!isApiConfigured()) {
-    throw new ApiError(
-      'Brak adresu backendu (VITE_API_URL). Aplikacja jest źle skonfigurowana.',
-      [],
-      false,
-    );
+    throw new ApiError('NO_API_URL', 'Brak adresu backendu (VITE_API_URL).', [], false);
   }
 
   const combined = withTimeout(signal, TIMEOUT_MS);
@@ -76,24 +95,29 @@ export async function analyze(request: AnalyzeRequest, signal: AbortSignal): Pro
   let body: unknown;
   try {
     try {
-      res = await fetch(`${API_URL}/analyze`, {
+      res = await fetch(`${API_URL}${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
+        body: JSON.stringify(payload),
         signal: combined.signal,
       });
     } catch (e) {
       if (signal.aborted) throw e;
-      if (combined.timedOut()) throw new ApiError('Analiza trwała zbyt długo. Spróbuj ponownie.');
-      throw new ApiError(
-        'Brak połączenia z serwerem analizy. Sprawdź internet i spróbuj ponownie.',
-      );
+      if (combined.timedOut()) throw new ApiError('TIMEOUT', 'Przekroczono limit czasu.');
+      throw new ApiError('NETWORK', 'Brak połączenia z serwerem.');
     }
     try {
       body = await res.json();
     } catch {
       if (signal.aborted) throw new DOMException('Anulowano', 'AbortError');
-      throw new ApiError(`Serwer zwrócił nieczytelną odpowiedź (HTTP ${res.status}).`);
+      throw new ApiError(
+        'BAD_RESPONSE',
+        `HTTP ${String(res.status)}`,
+        [],
+        true,
+        undefined,
+        res.status,
+      );
     }
   } finally {
     combined.dispose();
@@ -101,24 +125,46 @@ export async function analyze(request: AnalyzeRequest, signal: AbortSignal): Pro
 
   if (!res.ok) {
     const err = (body as ErrorBody).error;
-    const message =
-      typeof err?.message === 'string'
-        ? err.message
-        : `Analiza nie powiodła się (HTTP ${res.status}).`;
+    const code = typeof err?.code === 'string' ? err.code : 'BAD_RESPONSE';
+    const message = typeof err?.message === 'string' ? err.message : `HTTP ${String(res.status)}`;
     const details = Array.isArray(err?.details)
       ? err.details.filter((d): d is string => typeof d === 'string')
       : [];
+    const retryAfter =
+      typeof err?.retryAfterSeconds === 'number' ? err.retryAfterSeconds : undefined;
     // 400, 413 i 422 (filtr treści) dadzą ten sam wynik przy ponowieniu.
-    throw new ApiError(message, details, ![400, 413, 422].includes(res.status));
+    const retryable = ![400, 413, 422].includes(res.status);
+    throw new ApiError(code, message, details, retryable, retryAfter, res.status);
   }
 
   // Walidacja przed wyświetleniem: frontend nie ufa ślepo backendowi.
-  const parsed = insightSchema.safeParse(body);
+  const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    throw new ApiError(
-      'Wynik analizy nie jest zgodny ze schematem danych.',
-      formatIssues(parsed.error),
-    );
+    throw new ApiError('SCHEMA', 'Niezgodny schemat odpowiedzi.', formatIssues(parsed.error));
   }
   return parsed.data;
+}
+
+export function analyze(request: AnalyzeRequest, signal: AbortSignal): Promise<Insight> {
+  return post('/analyze', request, insightSchema, signal);
+}
+
+/** Tłumaczenie wyniku. Odpowiedź musi być tłumaczeniem na żądany język tego samego wyniku. */
+export async function translate(
+  insight: Insight,
+  target: OutputLanguage,
+  signal: AbortSignal,
+): Promise<Insight> {
+  const out = await post('/translate', { insight, target }, insightSchema, signal);
+  if (out.analysis.translation?.to !== target) {
+    throw new ApiError('SCHEMA', 'Odpowiedź nie jest tłumaczeniem na żądany język.');
+  }
+  return out;
+}
+
+export function translateDocumentChunk(
+  request: TranslateDocumentRequest,
+  signal: AbortSignal,
+): Promise<TranslateDocumentResponse> {
+  return post('/translate-document', request, translateDocumentResponseSchema, signal);
 }
