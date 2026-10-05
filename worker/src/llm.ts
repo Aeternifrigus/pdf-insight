@@ -62,10 +62,22 @@ async function postJson(
     throw new ProviderError(504, `Brak odpowiedzi dostawcy AI: ${(e as Error).name}`);
   }
   if (!res.ok) {
-    const detail = (await res.text().catch(() => '')).slice(0, 300);
-    throw new ProviderError(res.status, `Dostawca AI zwrócił HTTP ${res.status}: ${detail}`);
+    const detail = (await res.text().catch(() => '')).slice(0, 2000);
+    throw new ProviderError(
+      res.status,
+      `Dostawca AI zwrócił HTTP ${res.status}: ${detail.slice(0, 300)}`,
+      res.status === 429 ? parseRetryAfter(res.headers.get('Retry-After'), detail) : null,
+    );
   }
   return res.json();
+}
+
+/** Czas oczekiwania z nagłówka Retry-After (sekundy) albo z RetryInfo Gemini ("retryDelay": "7s"). */
+export function parseRetryAfter(header: string | null, body: string): number | null {
+  const fromHeader = header ? Number(header) : NaN;
+  if (Number.isFinite(fromHeader) && fromHeader >= 0) return fromHeader * 1000;
+  const m = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(body);
+  return m?.[1] ? Number(m[1]) * 1000 : null;
 }
 
 class GeminiClient implements LlmClient {

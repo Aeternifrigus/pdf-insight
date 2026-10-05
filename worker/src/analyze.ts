@@ -22,9 +22,18 @@ import {
   systemPrompt,
 } from './prompt';
 
-export const CHUNK_CHARS = 60_000;
-export const MAX_CHUNKS = 8;
-const CONCURRENCY = 3;
+/**
+ * Duże fragmenty (ok. 40 tys. tokenów, model ma okno 1 mln) oznaczają mało wywołań:
+ * dokument z limitem 400 tys. znaków to maks. 3 fragmenty + 1 wywołanie łączące,
+ * co mieści się w darmowym limicie ok. 10 zapytań na minutę.
+ */
+export const CHUNK_CHARS = 150_000;
+export const MAX_CHUNKS = 4;
+const CONCURRENCY = 2;
+/** Najdłuższe oczekiwanie na zwolnienie limitu dostawcy (HTTP 429) przed jedną ponowną próbą. */
+const MAX_RATE_LIMIT_WAIT_MS = 15_000;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Wyciąga obiekt JSON z odpowiedzi modelu (toleruje bloki ```json). */
 export function extractJson(raw: string): unknown {
@@ -166,6 +175,7 @@ export async function callValidated<S extends z.ZodType>(
 ): Promise<z.infer<S>> {
   const turns: Turn[] = [userTurn];
   let lastIssues: string[] = [];
+  let rateLimitRetried = false;
 
   for (let attempt = 0; attempt < 2; attempt++) {
     // Bez tego przy długich dokumentach backend pracowałby (i zużywał limit API)
@@ -179,6 +189,15 @@ export async function callValidated<S extends z.ZodType>(
     } catch (e) {
       if (e instanceof ProviderError) {
         if (e.status === 429) {
+          // Jedno krótkie odczekanie, jeśli dostawca podał czas i mieści się w budżecie.
+          const wait = e.retryAfterMs ?? 5_000;
+          const fits = Date.now() + wait + MIN_CALL_MS < deadline;
+          if (!rateLimitRetried && wait <= MAX_RATE_LIMIT_WAIT_MS && fits) {
+            rateLimitRetried = true;
+            await sleep(wait);
+            attempt--;
+            continue;
+          }
           throw new AppError(
             'AI_RATE_LIMITED',
             503,

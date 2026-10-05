@@ -29,6 +29,8 @@ export class ProviderError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    /** Sugerowany czas oczekiwania przy HTTP 429 (Retry-After lub RetryInfo Gemini). */
+    public readonly retryAfterMs: number | null = null,
   ) {
     super(message);
     this.name = 'ProviderError';

@@ -11,7 +11,7 @@ import {
 import type { Env } from './env';
 import { AppError, ProviderError } from './errors';
 import { handle } from './router';
-import type { LlmClient, Turn } from './llm';
+import { parseRetryAfter, type LlmClient, type Turn } from './llm';
 import { neutralizeTags } from './prompt';
 
 class FakeLlm implements LlmClient {
@@ -100,7 +100,7 @@ describe('analyzeDocument', () => {
     const long: AnalyzeRequest = {
       fileName: 'raport.pdf',
       pageCount: 3,
-      pages: [1, 2, 3].map((page) => ({ page, text: `Strona ${page} `.repeat(4000) })),
+      pages: [1, 2, 3].map((page) => ({ page, text: `Strona ${page} `.repeat(14_000) })),
       images: [],
     };
     const reduce = JSON.stringify({
@@ -154,6 +154,28 @@ describe('błędy dostawcy AI', () => {
     const badKey = new FailingLlm(403);
     await expect(analyzeDocument(request, badKey)).rejects.toMatchObject({ code: 'MISCONFIGURED' });
     expect(badKey.calls).toBe(1);
+  });
+
+  it('przy HTTP 429 odczekuje raz czas podany przez dostawcę i ponawia', async () => {
+    let calls = 0;
+    const llm: LlmClient = {
+      model: 'x',
+      complete: () => {
+        calls++;
+        return calls === 1
+          ? Promise.reject(new ProviderError(429, 'quota', 10))
+          : Promise.resolve(good);
+      },
+    };
+    const result = await analyzeDocument(request, llm);
+    expect(result.summary.length).toBeGreaterThan(0);
+    expect(calls).toBe(2);
+  });
+
+  it('odczytuje czas oczekiwania z nagłówka i z RetryInfo Gemini', () => {
+    expect(parseRetryAfter('3', '')).toBe(3000);
+    expect(parseRetryAfter(null, '{"retryDelay": "7s"}')).toBe(7000);
+    expect(parseRetryAfter(null, 'brak')).toBeNull();
   });
 
   it('kończy analizę po przekroczeniu budżetu czasu', async () => {
