@@ -20,7 +20,7 @@ async function mockApi(page: Page, respond?: (route: Route) => Promise<void>) {
       status: 200,
       contentType: 'application/json',
       headers: { 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ ...sampleInsight(), document: { ...sampleInsight().document } }),
+      body: JSON.stringify(sampleInsight()),
     });
   });
   return requests;
