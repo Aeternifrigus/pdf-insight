@@ -4,6 +4,7 @@ import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 // (na GitHub Pages: /<repo>/assets/pdf.worker-*.mjs). Bez tego worker pdf.js zwraca 404.
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { PdfReadError } from './file';
+import { formFieldLines } from './forms';
 import { isBlankImage, renderScale, selectScanPages, type PageInfo } from './scan';
 import { MAX_IMAGE_BASE64_CHARS, MAX_IMAGES, MAX_TEXT_CHARS } from './schema';
 import { joinTextItems } from './textItems';
@@ -152,7 +153,10 @@ function pagesWord(list: number[]): string {
 
 async function pageText(page: PDFPageProxy): Promise<string> {
   const content = await page.getTextContent();
-  return joinTextItems(content.items.filter((item) => 'str' in item));
+  const text = joinTextItems(content.items.filter((item) => 'str' in item));
+  const annotations: unknown = await page.getAnnotations({ intent: 'display' });
+  const fields = formFieldLines(Array.isArray(annotations) ? (annotations as unknown[]) : []);
+  return fields.length > 0 ? `${text}\n[Pola formularza]\n${fields.join('\n')}` : text;
 }
 
 async function pageHasImages(page: PDFPageProxy): Promise<boolean> {
