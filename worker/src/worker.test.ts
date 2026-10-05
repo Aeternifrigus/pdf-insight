@@ -306,6 +306,19 @@ describe('groundLists (kwoty i daty obecne w tekście)', () => {
     expect(result.analysis.warnings.join(' ')).toContain('999999 PLN');
   });
 
+  it('nie potwierdza kwoty różniącej się o czynnik 1000 przez przecinek dziesiętny', () => {
+    const r = groundLists(
+      { pages: [{ page: 1, text: 'Opłata wynosi 12,345 zł, a kaucja 1 500,00 zł.' }], images: [] },
+      [
+        { value: 12345, currency: 'PLN', context: 'opłata' },
+        { value: 1500, currency: 'PLN', context: 'kaucja' },
+      ],
+      [],
+      'pl',
+    );
+    expect(r.amounts.map((a) => a.foundInText)).toEqual([false, true]);
+  });
+
   it('przy skanach potwierdza wartości z tekstu, a resztę oznacza jako niesprawdzalne', () => {
     const r = groundLists(
       {

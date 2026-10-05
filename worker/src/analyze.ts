@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { chunkPages, type Chunk } from '../../src/lib/chunk';
 import { amountInText, dateInText, foldForSearch, numbersInText } from '../../src/lib/grounding';
 import { detectInjection, injectionWarnings } from '../../src/lib/injection';
+import { detectDecimalStyle } from '../../src/lib/localeNumbers';
 import { dedupeStrings, mergeLists } from '../../src/lib/merge';
 import {
   formatIssues,
@@ -349,11 +350,13 @@ export function groundLists(
   req: Pick<AnalyzeRequest, 'pages' | 'images'>,
   amounts: Insight['amounts'],
   dates: Insight['dates'],
+  languageHint?: string | null,
 ): { amounts: Insight['amounts']; dates: Insight['dates']; warnings: string[] } {
   // Ze skanami wartość nieznaleziona w tekście mogła pochodzić z obrazu: null = nie da się sprawdzić.
   const notFound = req.images.length > 0 ? null : false;
   const text = req.pages.map((p) => p.text).join('\n');
-  const numbers = numbersInText(text);
+  // Styl zapisu liczb (przecinek czy kropka dziesiętna) z tekstu, z językiem jako podpowiedzią.
+  const numbers = numbersInText(text, detectDecimalStyle(text, languageHint));
   const folded = foldForSearch(text);
   const checkedAmounts = amounts.map((a) => ({
     ...a,
@@ -439,7 +442,7 @@ export async function analyzeDocument(
   }
 
   const heuristic = injectionWarnings(detectInjection(req.pages));
-  const grounded = groundLists(req, lists.amounts, lists.dates);
+  const grounded = groundLists(req, lists.amounts, lists.dates, core.document.language);
   const insight: Insight = {
     document: { fileName: req.fileName, pages: req.pageCount, ...core.document },
     summary: core.summary,

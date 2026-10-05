@@ -1,3 +1,4 @@
+import { extractDates, parseNumbers, type DecimalStyle } from './localeNumbers';
 import { cleanText } from './textItems';
 
 /**
@@ -25,44 +26,21 @@ const MULTIPLIERS: Record<string, number> = {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Możliwe wartości liczbowe zapisu: "184 500,00", "1,234.56", "8 600", "1.5". */
-function interpretations(token: string): number[] {
-  const t = token.replace(/[\s']/g, '');
-  const out: number[] = [];
-  const lastComma = t.lastIndexOf(',');
-  const lastDot = t.lastIndexOf('.');
-  const asNumber = (s: string) => {
-    const n = Number(s);
-    if (Number.isFinite(n)) out.push(round2(n));
-  };
-  // Separator dziesiętny to ostatni z [.,], a wcześniejsze znaki to separatory tysięcy.
-  if (lastComma > lastDot)
-    asNumber(t.slice(0, lastComma).replace(/[.,]/g, '') + '.' + t.slice(lastComma + 1));
-  if (lastDot > lastComma)
-    asNumber(t.slice(0, lastDot).replace(/[.,]/g, '') + '.' + t.slice(lastDot + 1));
-  // Ten sam znak jako separator tysięcy ("12,345", "1.234.567").
-  asNumber(t.replace(/[.,]/g, ''));
-  return out;
-}
-
-/** Wszystkie wartości liczbowe, które można odczytać z tekstu (także "4,2 mln" → 4 200 000). */
-export function numbersInText(text: string): Set<number> {
+/**
+ * Wartości liczbowe zapisane w tekście (także "4,2 mln" → 4 200 000), odczytane według stylu
+ * zapisu dokumentu. Przy stylu 'unknown' przyjmowane są obie interpretacje (łagodniej).
+ * Wcześniejsza wersja zawsze brała obie, przez co "12,345 zł" w polskim tekście "potwierdzało"
+ * kwotę 12 345 zwróconą przez model, czyli błąd o czynnik 1000.
+ */
+export function numbersInText(text: string, style: DecimalStyle = 'unknown'): Set<number> {
   const values = new Set<number>();
-  const clean = cleanText(text);
-  const re = /\d(?:[\d.,']|\s(?=\d))*\d|\d/g;
-  for (const m of clean.matchAll(re)) {
-    const token = m[0];
-    // Kolumny tabel bywają sklejone spacjami ("2 140 58%"), więc bierzemy też podciągi grup.
-    const groups = token.split(/\s+/);
-    for (let i = 0; i < groups.length; i++) {
-      for (let j = i + 1; j <= Math.min(groups.length, i + 6); j++) {
-        for (const v of interpretations(groups.slice(i, j).join(' '))) values.add(v);
-      }
-    }
-    const after = clean.slice(m.index + token.length, m.index + token.length + 12);
+  const { rest } = extractDates(text);
+  for (const token of parseNumbers(rest, style)) {
+    values.add(token.value);
+    const after = rest.slice(token.index + token.raw.length, token.index + token.raw.length + 12);
     const word = /^\s*([a-ząćęłńóśźż]+)\.?/i.exec(after)?.[1]?.toLowerCase();
     const mult = word ? MULTIPLIERS[word] : undefined;
-    if (mult) for (const v of interpretations(token)) values.add(round2(v * mult));
+    if (mult) values.add(round2(token.value * mult));
   }
   return values;
 }

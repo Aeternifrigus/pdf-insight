@@ -9,7 +9,7 @@ Polska 2 140 58% Niemcy 520 17%. Umowa z dnia 12.03.2026 r., Go-live: 12 paździ
 Signed on March 5, 2026.`;
 
 describe('numbersInText / amountInText', () => {
-  const nums = numbersInText(doc);
+  const nums = numbersInText(doc, 'unknown');
 
   it('rozpoznaje polskie i angielskie zapisy kwot', () => {
     for (const v of [184500, 226935, 8600, 890, 1234.56])
@@ -24,6 +24,20 @@ describe('numbersInText / amountInText', () => {
   it('nie znajduje kwoty, której nie ma w dokumencie', () => {
     expect(amountInText(999_999, nums)).toBe(false);
     expect(amountInText(1, nums)).toBe(false);
+  });
+});
+
+describe('numbersInText: styl zapisu dokumentu', () => {
+  it('w polskim tekście "12,345 zł" to 12,345, a nie 12 345 (błąd o czynnik 1000)', () => {
+    const nums = numbersInText('Opłata wynosi 12,345 zł.', 'comma');
+    expect(amountInText(12.35, nums)).toBe(true);
+    expect(amountInText(12345, nums)).toBe(false);
+  });
+
+  it('w angielskim tekście "1,234 USD" to 1234, a nie 1,234', () => {
+    const nums = numbersInText('Fee: 1,234 USD.', 'point');
+    expect(amountInText(1234, nums)).toBe(true);
+    expect(amountInText(1.234, nums)).toBe(false);
   });
 });
 
