@@ -7,6 +7,7 @@ export type ErrorCode =
   | 'RATE_LIMITED'
   | 'AI_RATE_LIMITED'
   | 'AI_UNAVAILABLE'
+  | 'AI_TIMEOUT'
   | 'INVALID_AI_RESPONSE'
   | 'MISCONFIGURED'
   | 'INTERNAL';

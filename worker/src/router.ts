@@ -78,7 +78,8 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       if (e.status === 429 || e.code === 'AI_RATE_LIMITED') extra['Retry-After'] = '60';
       return errorResponse(e, extra);
     }
-    // Szczegóły błędu nie trafiają do klienta.
+    // Szczegóły błędu trafiają tylko do logów Workera, nie do klienta.
+    console.error('Unhandled error', e);
     return errorResponse(
       new AppError('INTERNAL', 500, 'Wystąpił nieoczekiwany błąd serwera.'),
       cors,

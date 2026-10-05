@@ -38,6 +38,11 @@ export default tseslint.config(
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
     },
   },
+  {
+    // Backend: console.error/warn trafiają do logów Workera (observability), console.log nadal zabronione.
+    files: ['worker/src/**/*.ts'],
+    rules: { 'no-console': ['error', { allow: ['error', 'warn'] }] },
+  },
   { files: ['eslint.config.js'], extends: [tseslint.configs.disableTypeChecked] },
   prettier,
 );

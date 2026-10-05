@@ -152,16 +152,27 @@ export function normalizeModelJson(input: unknown): unknown {
  * Wywołanie modelu z walidacją. Zgodnie z briefem: przy błędnej odpowiedzi
  * jest dokładnie 1 ponowna próba (z listą błędów), potem błąd.
  */
+/** Łączny budżet czasu analizy; klient czeka maks. 120 s, więc backend kończy wcześniej. */
+export const ANALYSIS_BUDGET_MS = 100_000;
+/** Minimalny czas potrzebny na sensowne wywołanie modelu. */
+const MIN_CALL_MS = 8_000;
+
 export async function callValidated<S extends z.ZodType>(
   llm: LlmClient,
   system: string,
   userTurn: Turn,
   schema: S,
+  deadline = Date.now() + ANALYSIS_BUDGET_MS,
 ): Promise<z.infer<S>> {
   const turns: Turn[] = [userTurn];
   let lastIssues: string[] = [];
 
   for (let attempt = 0; attempt < 2; attempt++) {
+    // Bez tego przy długich dokumentach backend pracowałby (i zużywał limit API)
+    // jeszcze długo po tym, jak przeglądarka przestała czekać.
+    if (deadline - Date.now() < MIN_CALL_MS) {
+      throw new AppError('AI_TIMEOUT', 504, 'Analiza trwała zbyt długo. Spróbuj krótszego pliku.');
+    }
     let raw: string;
     try {
       raw = await llm.complete(system, turns);
@@ -174,10 +185,17 @@ export async function callValidated<S extends z.ZodType>(
             'Przekroczono limit zapytań do dostawcy AI. Spróbuj ponownie za minutę.',
           );
         }
-        if (attempt === 0 && (e.status >= 500 || e.status === 504)) continue;
-        throw new AppError('AI_UNAVAILABLE', 502, 'Usługa AI jest chwilowo niedostępna.', [
-          e.message,
-        ]);
+        // Szczegóły od dostawcy trafiają tylko do logów Workera, nie do klienta.
+        console.error('LLM provider error', e.status, e.message);
+        if ([400, 401, 403, 404].includes(e.status)) {
+          throw new AppError(
+            'MISCONFIGURED',
+            500,
+            'Backend ma nieprawidłową konfigurację dostawcy AI (klucz lub model).',
+          );
+        }
+        if (attempt === 0 && e.status >= 500) continue;
+        throw new AppError('AI_UNAVAILABLE', 502, 'Usługa AI jest chwilowo niedostępna.');
       }
       throw e;
     }
@@ -277,6 +295,7 @@ export async function analyzeDocument(
   req: AnalyzeRequest,
   llm: LlmClient,
   now: () => Date = () => new Date(),
+  budgetMs = ANALYSIS_BUDGET_MS,
 ): Promise<Insight> {
   const pages = preparePages(req);
   const totalText = pages.reduce((n, p) => n + p.text.trim().length, 0);
@@ -293,6 +312,7 @@ export async function analyzeDocument(
     );
   }
 
+  const deadline = Date.now() + budgetMs;
   const nonce = newNonce();
   const system = systemPrompt(nonce);
   const meta = { pageCount: req.pageCount };
@@ -306,6 +326,7 @@ export async function analyzeDocument(
       system,
       chunkTurn(nonce, req, chunks[0] as Chunk, req.images),
       modelOutputSchema,
+      deadline,
     );
     core = out;
     lists = mergeLists([out]);
@@ -316,6 +337,7 @@ export async function analyzeDocument(
         system,
         chunkTurn(nonce, req, chunk, req.images, { index, total: chunks.length }),
         modelOutputSchema,
+        deadline,
       ),
     );
     const reduceNonce = newNonce();
@@ -324,6 +346,7 @@ export async function analyzeDocument(
       reduceSystemPrompt(reduceNonce),
       { role: 'user', text: reducePrompt(reduceNonce, meta, parts) },
       reduceOutputSchema,
+      deadline,
     );
     lists = mergeLists(parts);
   }

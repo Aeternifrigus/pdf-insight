@@ -9,7 +9,7 @@ import {
   parseUnambiguousNumber,
 } from './analyze';
 import type { Env } from './env';
-import { AppError } from './errors';
+import { AppError, ProviderError } from './errors';
 import { handle } from './router';
 import type { LlmClient, Turn } from './llm';
 import { neutralizeTags } from './prompt';
@@ -126,6 +126,40 @@ describe('analyzeDocument', () => {
     const result = await analyzeDocument(withScan, llm);
     expect(llm.calls[0]?.turns[0]?.images).toHaveLength(1);
     expect(result.analysis.ocrPages).toEqual([3]);
+  });
+});
+
+describe('błędy dostawcy AI', () => {
+  class FailingLlm implements LlmClient {
+    readonly model = 'x';
+    calls = 0;
+    constructor(private readonly status: number) {}
+    complete(): Promise<string> {
+      this.calls++;
+      return Promise.reject(new ProviderError(this.status, 'secret upstream body: key=abc'));
+    }
+  }
+
+  it('nie przekazuje klientowi treści błędu dostawcy', async () => {
+    const err = await analyzeDocument(request, new FailingLlm(503)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AppError);
+    expect(JSON.stringify(err)).not.toContain('secret upstream');
+    expect((err as AppError).details ?? []).toEqual([]);
+  });
+
+  it('ponawia raz przy błędzie 5xx, a zły klucz zgłasza jako błąd konfiguracji', async () => {
+    const flaky = new FailingLlm(503);
+    await analyzeDocument(request, flaky).catch(() => undefined);
+    expect(flaky.calls).toBe(2);
+    const badKey = new FailingLlm(403);
+    await expect(analyzeDocument(request, badKey)).rejects.toMatchObject({ code: 'MISCONFIGURED' });
+    expect(badKey.calls).toBe(1);
+  });
+
+  it('kończy analizę po przekroczeniu budżetu czasu', async () => {
+    await expect(
+      analyzeDocument(request, new FakeLlm([good]), undefined, 1000),
+    ).rejects.toMatchObject({ code: 'AI_TIMEOUT' });
   });
 });
 
