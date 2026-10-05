@@ -50,6 +50,19 @@ describe('moneyMentions', () => {
     ]);
   });
 
+  it('nie przypisuje waluty z końca poprzedniego wiersza numerowi pozycji w tabeli', () => {
+    expect(
+      moneyMentions('1 Konsultant 240,00 zł\n2 Starszy programista 280,00 zł', 'comma'),
+    ).toEqual([
+      { value: 240, currency: 'PLN' },
+      { value: 280, currency: 'PLN' },
+    ]);
+    // Kwota przełamana przed walutą („184 500,00” / „zł netto”) nadal jest rozpoznawana.
+    expect(moneyMentions('w wysokości 184 500,00\nzł netto', 'comma')).toEqual([
+      { value: 184500, currency: 'PLN' },
+    ]);
+  });
+
   it('pomija liczby bez waluty', () => {
     expect(moneyMentions('6 sesji po 4 godziny, 120 użytkowników', 'comma')).toEqual([]);
   });

@@ -173,7 +173,9 @@ const AFTER_RE = new RegExp(
   `^\\s*(?:(tys\\.?|mln|mld|million|billion|thousand)\\s*)?(${CURRENCY_ALT})(?![\\p{L}])`,
   'iu',
 );
-const BEFORE_RE = new RegExp(`(?:^|[^\\p{L}])(${CURRENCY_ALT})\\s*$`, 'iu');
+// Waluta przed liczbą tylko w tym samym wierszu: w tabelach wiersz kończy się często na „zł”,
+// a następny zaczyna się numerem pozycji („240,00 zł” / „2 Starszy programista”), co dawało „2 zł”.
+const BEFORE_RE = new RegExp(`(?:^|[^\\p{L}])(${CURRENCY_ALT})[ \\t]*$`, 'iu');
 const MULT: Record<string, number> = {
   tys: 1e3,
   'tys.': 1e3,
