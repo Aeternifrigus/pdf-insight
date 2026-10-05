@@ -3,6 +3,7 @@ import { chunkPages } from './chunk';
 import { detectInjection } from './injection';
 import { dedupeAmounts, dedupeStrings, mergeLists } from './merge';
 import { sampleModelOutput } from './fixtures';
+import { formatPageRanges } from './ranges';
 import { countSentences } from './sentences';
 import { cleanText, joinTextItems, type TextItemLike } from './textItems';
 
@@ -162,5 +163,14 @@ describe('merge', () => {
     expect(merged.dates.map((d) => d.date)).toEqual(['2026-04-01', '2026-10-12']);
     expect(merged.entities.organizations).toContain('Nowa Firma');
     expect(merged.amounts).toHaveLength(1);
+  });
+});
+
+describe('formatPageRanges', () => {
+  it('zwija kolejne strony w zakresy', () => {
+    expect(formatPageRanges([5, 6, 7, 9, 11, 12])).toBe('5–7, 9, 11–12');
+    expect(formatPageRanges(Array.from({ length: 146 }, (_, i) => i + 5))).toBe('5–150');
+    expect(formatPageRanges([3, 1, 2, 2])).toBe('1–3');
+    expect(formatPageRanges([])).toBe('');
   });
 });

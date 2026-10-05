@@ -5,7 +5,15 @@ import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { PdfReadError } from './file';
 import { formFieldLines } from './forms';
-import { isBlankImage, renderScale, selectScanPages, type PageInfo } from './scan';
+import { formatPageRanges } from './ranges';
+import {
+  isBlankImage,
+  MIN_TEXT_CHARS,
+  renderScale,
+  SCAN_WITH_HEADER_CHARS,
+  selectScanPages,
+  type PageInfo,
+} from './scan';
 import { MAX_IMAGE_BASE64_CHARS, MAX_IMAGES, MAX_TEXT_CHARS } from './schema';
 import { joinTextItems } from './textItems';
 
@@ -80,14 +88,22 @@ export async function extractPdf(
     const failed: number[] = [];
 
     // Etap 1: tekst wszystkich stron. Błąd jednej strony nie przerywa całego odczytu.
+    let totalChars = 0;
     for (let n = 1; n <= pdf.numPages; n++) {
       throwIfAborted(signal);
       try {
         const page = await pdf.getPage(n);
         const text = await pageText(page);
-        const hasImages = text.length < 400 ? await pageHasImages(page) : false;
+        const textChars = text.replace(/\s/g, '').length;
+        // Lista operacji (wykrycie obrazów) jest kosztowna, bo dekoduje obrazy strony.
+        // Potrzebna tylko dla stron "pomiędzy": strona bez tekstu i tak jest kandydatem na skan.
+        const hasImages =
+          textChars >= MIN_TEXT_CHARS && textChars < SCAN_WITH_HEADER_CHARS
+            ? await pageHasImages(page)
+            : false;
         pages.push({ page: n, text });
-        info.push({ page: n, textChars: text.replace(/\s/g, '').length, hasImages });
+        info.push({ page: n, textChars, hasImages });
+        totalChars += text.length;
         page.cleanup();
       } catch {
         throwIfAborted(signal);
@@ -96,13 +112,12 @@ export async function extractPdf(
         info.push({ page: n, textChars: 0, hasImages: true });
       }
       onProgress?.(n, pdf.numPages);
-    }
-
-    const totalChars = pages.reduce((s, p) => s + p.text.length, 0);
-    if (totalChars > MAX_TEXT_CHARS) {
-      throw new PdfReadError(
-        `Dokument ma ${totalChars.toLocaleString('pl-PL')} znaków tekstu. Limit to ${MAX_TEXT_CHARS.toLocaleString('pl-PL')}.`,
-      );
+      // Przerywamy od razu, zamiast czytać setki kolejnych stron tylko po to, żeby odrzucić plik.
+      if (totalChars > MAX_TEXT_CHARS) {
+        throw new PdfReadError(
+          `Dokument ma ponad ${MAX_TEXT_CHARS.toLocaleString('pl-PL')} znaków tekstu (przekroczone na stronie ${String(n)} z ${String(pdf.numPages)}). Spróbuj krótszego pliku.`,
+        );
+      }
     }
 
     // Etap 2: strony bez użytecznej warstwy tekstowej renderujemy do JPEG.
@@ -128,16 +143,16 @@ export async function extractPdf(
     const notes: string[] = [];
     if (skipped.length > 0) {
       notes.push(
-        `${pagesWord(skipped)} ${skipped.join(', ')} wyglądają na skany i nie zostały odczytane (limit to ${MAX_IMAGES} zeskanowane strony).`,
+        `${pagesWord(skipped)} ${formatPageRanges(skipped)} wyglądają na skany i nie zostały odczytane (limit to ${String(MAX_IMAGES)} zeskanowane strony).`,
       );
     }
     if (failed.length > 0) {
       notes.push(
-        `Nie udało się odczytać: ${pagesWord(failed).toLowerCase()} ${[...new Set(failed)].sort((a, b) => a - b).join(', ')}.`,
+        `Nie udało się odczytać: ${pagesWord(failed).toLowerCase()} ${formatPageRanges(failed)}.`,
       );
     }
     if (blank.length > 0) {
-      notes.push(`${pagesWord(blank)} ${blank.join(', ')} są puste i zostały pominięte.`);
+      notes.push(`${pagesWord(blank)} ${formatPageRanges(blank)} są puste i zostały pominięte.`);
     }
 
     return { pageCount: pdf.numPages, pages, images, notes };
