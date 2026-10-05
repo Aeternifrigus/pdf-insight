@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { amountInText, dateInText, foldForSearch, numbersInText } from './grounding';
+import {
+  amountInText,
+  buildEvidence,
+  checkAmount,
+  dateInText,
+  foldForSearch,
+  numbersInText,
+} from './grounding';
 
 // Wąska twarda spacja (U+202F) jako separator tysięcy, jak w wielu polskich dokumentach.
 const NNBSP = '\u202F';
@@ -53,5 +60,16 @@ describe('dateInText', () => {
   it('nie znajduje daty spoza dokumentu ani fragmentu innej daty', () => {
     expect(dateInText('2026-05-01', folded)).toBe(false);
     expect(dateInText('2026-03-02', foldForSearch('termin 12.3.2026'))).toBe(false);
+  });
+});
+
+describe('buildEvidence: liczby przełamane między wierszami', () => {
+  it('rozpoznaje kwotę zapisaną jako "(295" i "200,00 zł" w kolejnym wierszu', () => {
+    const ev = buildEvidence(
+      [{ text: 'abonament 12 300,00 zł/mies. (295\n200,00 zł za 24 miesiące)' }],
+      'pl',
+    );
+    expect(checkAmount(295200, 'PLN', ev)).toBe('ok');
+    expect(checkAmount(12300, 'PLN', ev)).toBe('ok');
   });
 });

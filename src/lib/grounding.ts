@@ -227,9 +227,13 @@ export function buildEvidence(pages: { text: string }[], languageHint?: string |
   const clean = parts.map((p) => p.clean).join('\n');
   const injected = parts.map((p) => p.injected).join('\n');
   const style = detectDecimalStyle(clean, languageHint);
-  const numbers = numbersInText(clean, style);
+  // Liczba przełamana między wierszami ("(295" / "200,00 zł") jest w PDF częsta. Wersja z
+  // połączonymi grupami cyfr jest dodawana obok oryginału (suma zbiorów), żeby prawdziwa
+  // wartość nie była zgłaszana jako nieznaleziona.
+  const joined = clean.replace(/(\d)[ \t]*\n[ \t]*(\d{3}(?:[,.]\d+)?)(?!\d)/g, '$1 $2');
+  const numbers = new Set([...numbersInText(clean, style), ...numbersInText(joined, style)]);
   const money = new Map<number, Set<string>>();
-  for (const m of moneyMentions(clean, style)) {
+  for (const m of [...moneyMentions(clean, style), ...moneyMentions(joined, style)]) {
     money.set(m.value, (money.get(m.value) ?? new Set()).add(m.currency));
   }
   const folded = foldForSearch(clean);
