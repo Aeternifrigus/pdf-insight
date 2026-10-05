@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "../node_modules/.tmp/tsconfig.eval.tsbuildinfo",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "composite": true
+  },
+  "include": [
+    "*.ts",
+    "../src/lib/schema.ts",
+    "../src/lib/sentences.ts",
+    "../src/lib/textItems.ts",
+    "../src/lib/forms.ts",
+    "../src/lib/injection.ts",
+    "../src/lib/grounding.ts",
+    "../src/lib/localeNumbers.ts"
+  ]
+}
