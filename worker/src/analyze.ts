@@ -6,6 +6,7 @@ import {
   formatIssues,
   insightSchema,
   modelOutputSchema,
+  partialOutputSchema,
   reduceOutputSchema,
   type AnalyzeRequest,
   type Insight,
@@ -145,6 +146,10 @@ export function normalizeModelJson(input: unknown): unknown {
   for (const k of ['keyPoints', 'keywords', 'warnings'] as const) {
     if (o[k] === undefined || o[k] === null) o[k] = [];
   }
+  // Nadmiar punktów nie jest błędem treści: zostawiamy pierwsze (model podaje je od najważniejszych),
+  // zamiast odrzucać całą analizę i zużywać ponowną próbę.
+  if (Array.isArray(o.keyPoints) && o.keyPoints.length > 7) o.keyPoints = o.keyPoints.slice(0, 7);
+  if (Array.isArray(o.keywords) && o.keywords.length > 15) o.keywords = o.keywords.slice(0, 15);
   for (const k of ['amounts', 'dates'] as const) {
     if (o[k] === undefined || o[k] === null) o[k] = [];
   }
@@ -361,7 +366,7 @@ export async function analyzeDocument(
         llm,
         system,
         chunkTurn(nonce, req, chunk, req.images, { index, total: chunks.length }),
-        modelOutputSchema,
+        partialOutputSchema,
         deadline,
       ),
     );

@@ -37,7 +37,7 @@ const EXTRACTION_RULES = `RULES:
 - JSON keys stay in English. All text values are written in the document's own language.
 - Use only facts stated in the document. Never guess or invent. Missing information means null or [].
 - summary: 3 to 5 complete sentences that say what the document is, who the parties are and its most important terms (values, dates, obligations).
-- keyPoints: 3 to 7 short, concrete points (numbers and dates where relevant).
+- keyPoints: 3 to 7 short, concrete points (numbers and dates where relevant), most important first.
 - document.type: "faktura" (invoice), "umowa" (contract/agreement), "oferta" (offer/quote), "raport" (report), otherwise "inne". If an attachment is a different kind of document, classify by the main document.
 - amounts: monetary amounts explicitly written in the document. "value" is a JSON number with a dot as decimal separator (184 500,00 → 184500). "currency" is the ISO 4217 code of the currency as written (zł → PLN, € → EUR, $ → USD); never convert currencies. "context" briefly says what the amount is, including net/gross (netto/brutto) and period (monthly/yearly) when stated. Skip percentages. Do not repeat the same amount for the same purpose. If there are very many (e.g. long price lists), keep the 30 most important.
 - dates: only full calendar dates explicitly present in the document, as YYYY-MM-DD, with a short context. Skip dates without a day. At most 30, most important first.

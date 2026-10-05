@@ -117,6 +117,41 @@ describe('analyzeDocument', () => {
     expect(result.amounts).toHaveLength(1);
   });
 
+  it('nie odrzuca długiego dokumentu, gdy jedna część to sama tabela', async () => {
+    const big: AnalyzeRequest = {
+      fileName: 'r.pdf',
+      pageCount: 3,
+      images: [],
+      unreadPages: [],
+      pages: [1, 2, 3].map((page) => ({ page, text: `Strona ${String(page)} `.repeat(14_000) })),
+    };
+    const tablePart = JSON.stringify({
+      ...sampleModelOutput(),
+      summary: 'Tabela cen.',
+      keyPoints: ['Cennik'],
+    });
+    const reduce = JSON.stringify({
+      document: sampleModelOutput().document,
+      summary: sampleModelOutput().summary,
+      keyPoints: sampleModelOutput().keyPoints,
+    });
+    const llm = new FakeLlm([good, tablePart, good, reduce]);
+    const result = await analyzeDocument(big, llm);
+    expect(result.analysis.chunks).toBe(3);
+    expect(llm.calls).toHaveLength(4);
+  });
+
+  it('przycina nadmiarowe punkty zamiast odrzucać analizę', async () => {
+    const eight = JSON.stringify({
+      ...sampleModelOutput(),
+      keyPoints: Array.from({ length: 8 }, (_, i) => `punkt ${String(i)}`),
+    });
+    const llm = new FakeLlm([eight]);
+    const result = await analyzeDocument(request, llm);
+    expect(result.keyPoints).toHaveLength(7);
+    expect(llm.calls).toHaveLength(1);
+  });
+
   it('mówi modelowi, których stron nie widzi, i zapisuje to w wyniku', async () => {
     const llm = new FakeLlm([good]);
     const result = await analyzeDocument(

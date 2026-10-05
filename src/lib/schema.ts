@@ -138,6 +138,16 @@ export const modelOutputSchema = z.object({
 });
 export type ModelOutput = z.infer<typeof modelOutputSchema>;
 
+/**
+ * Wynik jednej części długiego dokumentu (etap "map"). Reguły 3–5 zdań i 3–7 punktów
+ * dotyczą wyniku końcowego; część złożona np. z samej tabeli cen może ich nie spełnić,
+ * a wcześniej taki fragment wywracał analizę całego dokumentu.
+ */
+export const partialOutputSchema = modelOutputSchema.extend({
+  summary: nonEmpty,
+  keyPoints: z.array(nonEmpty).max(7),
+});
+
 /** Wynik etapu "reduce" przy długich dokumentach. */
 export const reduceOutputSchema = z.object({
   document: documentSchema.omit({ fileName: true, pages: true }),
