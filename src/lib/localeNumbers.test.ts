@@ -56,6 +56,16 @@ describe('detectDecimalStyle', () => {
 });
 
 describe('compareNumericContent (tłumaczenie PL → EN)', () => {
+  it('zły zapis i zmieniona wartość są raportowane osobno', () => {
+    const r = compareNumericContent(
+      'Kapitał 2 500 000,00 zł, rabat 0,2%.',
+      'comma',
+      'Capital PLN 2 500 000,00, discount 0.3%.',
+      'point',
+    );
+    expect(r).toEqual({ missing: ['0.2'], extra: ['0.3'], wrongFormat: ['2 500 000,00'] });
+  });
+
   const pl =
     'Wynagrodzenie wynosi 184 500,00 zł netto, abonament 12 300,00 zł. Dostępność 99,5%. Umowa z 12.03.2026 r.';
 
@@ -73,8 +83,8 @@ describe('compareNumericContent (tłumaczenie PL → EN)', () => {
     const en =
       'The fee is PLN 184 500,00 net, the subscription PLN 12,300.00. Availability 99,5%. Agreement of 12 March 2026.';
     const r = compareNumericContent(pl, 'comma', en, 'point');
-    expect(r.wrongFormat).toEqual(['184 500,00', '99,5']);
-    expect(r.missing).toContain('99.5');
+    // Wartości się zgadzają, więc zgłoszony jest tylko zły zapis, bez szumu typu "dodano 0".
+    expect(r).toEqual({ missing: [], extra: [], wrongFormat: ['184 500,00', '99,5'] });
   });
 
   it('wykrywa zmienioną datę i zgubioną kwotę', () => {

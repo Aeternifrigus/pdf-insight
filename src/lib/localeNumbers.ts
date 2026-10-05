@@ -214,25 +214,54 @@ export function compareNumericContent(
 ): { missing: string[]; extra: string[]; wrongFormat: string[] } {
   const side = (text: string, style: DecimalStyle) => {
     const { dates, rest } = extractDates(text);
-    const values = parseNumbers(rest, style === 'unknown' ? 'comma' : style).map((t) =>
-      String(t.value),
-    );
-    return [...dates, ...values];
+    const parsed = parseNumbers(rest, style === 'unknown' ? 'comma' : style);
+    return [...dates, ...parsed.map((t) => String(t.value))];
   };
   const count = (items: string[]) => {
     const m = new Map<string, number>();
     for (const i of items) m.set(i, (m.get(i) ?? 0) + 1);
     return m;
   };
+
+  // Liczba w złym zapisie, ale z poprawną wartością ("184 500,00" w tekście angielskim) to problem
+  // zapisu, nie wartości: liczymy ją według stylu, w którym faktycznie jest zapisana, żeby nie
+  // pojawiała się dodatkowo jako "brakująca" i "dodana" (np. 184500 i 0 z części ",00").
+  const { dates: targetDates, rest: targetRest } = extractDates(target);
+  const wrong = wrongFormatTokens(targetRest, targetStyle);
+  let cleaned = targetRest;
+  for (const w of wrong)
+    cleaned =
+      cleaned.slice(0, w.index) + ' '.repeat(w.raw.length) + cleaned.slice(w.index + w.raw.length);
+  const targetValues = [
+    ...targetDates,
+    ...wrong.map((w) => String(w.value)),
+    ...parseNumbers(cleaned, targetStyle === 'unknown' ? 'comma' : targetStyle).map((t) =>
+      String(t.value),
+    ),
+  ];
+
   const src = count(side(source, sourceStyle));
-  const dst = count(side(target, targetStyle));
+  const dst = count(targetValues);
   const diff = (a: Map<string, number>, b: Map<string, number>) =>
     [...a].flatMap(([k, n]) => Array<string>(Math.max(0, n - (b.get(k) ?? 0))).fill(k));
-  return {
-    missing: diff(src, dst),
-    extra: diff(dst, src),
-    wrongFormat: wrongFormat(target, targetStyle),
-  };
+  return { missing: diff(src, dst), extra: diff(dst, src), wrongFormat: wrong.map((w) => w.raw) };
+}
+
+/** Liczby zapisane w stylu przeciwnym do oczekiwanego, z wartością odczytaną według ich zapisu. */
+function wrongFormatTokens(text: string, style: DecimalStyle): NumberToken[] {
+  const re =
+    style === 'point'
+      ? /\d{1,3}(?: \d{3})*,\d{1,2}(?!\d)/g
+      : style === 'comma'
+        ? /\d{1,3}(?:,\d{3})+\.\d+/g
+        : null;
+  if (!re) return [];
+  const value = style === 'point' ? valueComma : valuePoint;
+  return [...text.matchAll(re)].map((m) => ({
+    raw: m[0],
+    index: m.index,
+    value: round2(value(m[0])),
+  }));
 }
 
 /**
@@ -241,8 +270,5 @@ export function compareNumericContent(
  * odczyta "1,5" jako 15 albo jako dwie liczby.
  */
 export function wrongFormat(text: string, style: DecimalStyle): string[] {
-  const { rest } = extractDates(text);
-  if (style === 'point') return rest.match(/\d{1,3}(?: \d{3})*,\d{1,2}(?!\d)/g) ?? [];
-  if (style === 'comma') return rest.match(/\d{1,3}(?:,\d{3})+\.\d+/g) ?? [];
-  return [];
+  return wrongFormatTokens(extractDates(text).rest, style).map((t) => t.raw);
 }
