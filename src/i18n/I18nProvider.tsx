@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { z } from 'zod';
 import { I18nContext, initialLang, LANG_KEY } from './context';
 import { LOCALES, MESSAGES, type Lang } from './messages';
 
@@ -7,6 +8,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = lang;
+    // Domyślne komunikaty walidacji Zod (np. w „Szczegółach technicznych”) w języku interfejsu.
+    z.config(lang === 'pl' ? z.locales.pl() : z.locales.en());
   }, [lang]);
 
   const setLang = useCallback((next: Lang) => {

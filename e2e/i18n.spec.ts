@@ -27,7 +27,7 @@ test('wynik po angielsku: angielski zapis liczb, tłumaczenie z historii i pobra
 
   await page
     .getByRole('group', { name: 'Język wyniku' })
-    .getByRole('button', { name: 'English' })
+    .getByRole('button', { name: 'Angielski' })
     .click();
   // Tłumaczenie: angielski zapis (przecinek tysięcy, kropka dziesiętna), ta sama wartość.
   await expect(amounts).toContainText(/PLN\s184,500\.00/);
@@ -68,7 +68,7 @@ test('wynik po angielsku: angielski zapis liczb, tłumaczenie z historii i pobra
   await page.getByRole('button', { name: /Umowa ramowa nr 14\/2026/ }).click();
   await page
     .getByRole('group', { name: 'Język wyniku' })
-    .getByRole('button', { name: 'English' })
+    .getByRole('button', { name: 'Angielski' })
     .click();
   await expect(amounts).toContainText(/PLN\s184,500\.00/);
   expect(calls.translate).toHaveLength(1);
@@ -89,7 +89,7 @@ test('tłumaczenie z niezgodnymi liczbami jest jawnie oznaczone', async ({ page 
   await upload(page, 'text-with-injection.pdf');
   await page
     .getByRole('group', { name: 'Język wyniku' })
-    .getByRole('button', { name: 'English' })
+    .getByRole('button', { name: 'Angielski' })
     .click();
   await expect(page.getByText(/nie zgadzają się z oryginałem/)).toBeVisible();
   await expect(page.getByText('summary: brakuje 184500; dodatkowo 184000')).toBeVisible();

@@ -52,6 +52,9 @@ function contentLocale(lang: string): string {
 
 type Issue = Insight['amounts'][number]['issue'];
 
+/** "angielski" → "Angielski" (nazwy języków w Intl są pisane małą literą po polsku). */
+const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
+
 /** Oznaczenie wyniku kontroli wartości w tekście dokumentu (bez AI). */
 function CheckBadge({ foundInText, issue }: { foundInText?: boolean | null; issue?: Issue }) {
   const { t, lang } = useI18n();
@@ -190,7 +193,7 @@ export function ResultView({
             aria-pressed={view === 'translated'}
             onClick={() => void showTranslated()}
           >
-            {t.languageNames[target]}
+            {capitalize(languageName(target, lang))}
           </button>
         </div>
       </div>

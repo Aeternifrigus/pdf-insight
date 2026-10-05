@@ -184,3 +184,15 @@ test('Content-Security-Policy nie blokuje aplikacji', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Podsumowanie' })).toBeVisible();
   expect(violations).toEqual([]);
 });
+
+test('w polskim interfejsie nie ma angielskich etykiet poza przełącznikiem języka', async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto('./');
+  await upload(page, 'text-with-injection.pdf');
+  await expect(page.getByRole('heading', { name: 'Podsumowanie' })).toBeVisible();
+  const resultSwitch = page.getByRole('group', { name: 'Język wyniku' });
+  await expect(resultSwitch).toContainText('Angielski');
+  await expect(resultSwitch).not.toContainText('English');
+});
