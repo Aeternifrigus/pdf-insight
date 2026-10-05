@@ -69,19 +69,28 @@ export function injectionWarnings(findings: InjectionFinding[]): string[] {
   );
 }
 
-const matches = (text: string) => PATTERNS.some((re) => re.test(foldText(text)));
+const matchesFolded = (folded: string) => PATTERNS.some((re) => re.test(folded));
 
 /**
  * Dzieli tekst na wiersze z podejrzanym poleceniem i resztę. Wiersz jest podejrzany, jeśli sam
  * pasuje do wzorca albo razem z sąsiednim (fraza przełamana na dwa wiersze).
+ * Działa w backendzie, gdzie darmowy plan Cloudflare daje ok. 10 ms CPU na żądanie, więc:
+ * strona bez żadnego dopasowania jest zwracana od razu (jedno sprawdzenie na stronę), a na
+ * stronie z dopasowaniem każdy wiersz jest normalizowany tylko raz.
  */
 export function splitInjectedLines(text: string): { clean: string; injected: string } {
+  if (!matchesFolded(foldText(text))) return { clean: text, injected: '' };
   const lines = text.split('\n');
+  const folded = lines.map(foldText);
+  const hit = folded.map(matchesFolded);
   const flagged = new Set<number>();
-  lines.forEach((line, i) => {
-    if (matches(line)) flagged.add(i);
-    const next = lines[i + 1];
-    if (next !== undefined && !matches(line) && !matches(next) && matches(`${line} ${next}`)) {
+  hit.forEach((isHit, i) => {
+    if (isHit) {
+      flagged.add(i);
+      return;
+    }
+    const next = folded[i + 1];
+    if (next !== undefined && !hit[i + 1] && matchesFolded(`${folded[i] ?? ''} ${next}`)) {
       flagged.add(i);
       flagged.add(i + 1);
     }
