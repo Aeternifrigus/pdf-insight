@@ -50,6 +50,30 @@ function contentLocale(lang: string): string {
   return lang;
 }
 
+type Issue = Insight['amounts'][number]['issue'];
+
+/** Oznaczenie wyniku kontroli wartości w tekście dokumentu (bez AI). */
+function CheckBadge({ foundInText, issue }: { foundInText?: boolean | null; issue?: Issue }) {
+  const { t, lang } = useI18n();
+  if (foundInText !== false) return null;
+  const kind = issue ?? 'notInText';
+  const [label, title] =
+    kind === 'fromInstruction'
+      ? [t.result.fromInstruction, t.result.fromInstructionTitle]
+      : kind === 'currencyMismatch'
+        ? [t.result.currencyMismatch, t.result.currencyMismatchTitle]
+        : [t.result.notInText, t.result.notInTextTitle];
+  return (
+    <span
+      className={`not-in-text${kind === 'fromInstruction' ? ' is-severe' : ''}`}
+      title={title}
+      lang={lang}
+    >
+      {label}
+    </span>
+  );
+}
+
 type TranslateState = { kind: 'idle' } | { kind: 'loading' } | { kind: 'error'; message: string };
 
 export function ResultView({
@@ -264,11 +288,7 @@ export function ResultView({
                       </td>
                       <td>
                         {a.context}
-                        {a.foundInText === false && (
-                          <span className="not-in-text" title={t.result.notInTextTitle} lang={lang}>
-                            {t.result.notInText}
-                          </span>
-                        )}
+                        <CheckBadge foundInText={a.foundInText} issue={a.issue} />
                       </td>
                     </tr>
                   ))}
@@ -289,11 +309,7 @@ export function ResultView({
                   <time dateTime={d.date}>{formatDate(d.date, cLocale)}</time>
                   <span>
                     {d.context}
-                    {d.foundInText === false && (
-                      <span className="not-in-text" title={t.result.notInTextTitle} lang={lang}>
-                        {t.result.notInText}
-                      </span>
-                    )}
+                    <CheckBadge foundInText={d.foundInText} issue={d.issue} />
                   </span>
                 </li>
               ))}

@@ -691,6 +691,12 @@ mark {
   white-space: nowrap;
 }
 
+.not-in-text.is-severe {
+  color: var(--paper);
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
 .timeline {
   margin: 0;
   padding: 0;

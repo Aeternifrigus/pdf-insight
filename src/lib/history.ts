@@ -9,7 +9,7 @@ export const HISTORY_LIMIT = 8;
  * dla tego samego pliku. Wynik z historii jest używany ponownie tylko przy zgodnej wersji;
  * inaczej poprawka błędu nie dotarłaby do plików analizowanych wcześniej.
  */
-export const PIPELINE_VERSION = 4;
+export const PIPELINE_VERSION = 5;
 
 export interface HistoryEntry {
   id: string;

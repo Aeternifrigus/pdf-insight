@@ -25,6 +25,15 @@ function escapeLines(text: string): string {
     .join('  \n');
 }
 
+function issueLabel(
+  t: (typeof MESSAGES)[Lang],
+  issue: 'notInText' | 'currencyMismatch' | 'fromInstruction' | undefined,
+): string {
+  if (issue === 'fromInstruction') return t.result.fromInstruction;
+  if (issue === 'currencyMismatch') return t.result.currencyMismatch;
+  return t.result.notInText;
+}
+
 /** Język tekstów w wyniku: tłumaczenie albo język dokumentu. */
 export function contentLanguage(insight: Insight): string {
   return insight.analysis.translation?.to ?? insight.document.language;
@@ -73,7 +82,7 @@ export function buildSummaryMarkdown(insight: Insight, lang: Lang): string {
   else {
     out.push(`| ${t.result.amount} | ${t.result.concerns} |`, '| ---: | --- |');
     for (const a of insight.amounts) {
-      const flag = a.foundInText === false ? ` (${t.result.notInText})` : '';
+      const flag = a.foundInText === false ? ` (${issueLabel(t, a.issue)})` : '';
       out.push(`| ${formatMoney(a.value, a.currency, locale)} | ${escapeMd(a.context)}${flag} |`);
     }
     out.push('');
@@ -83,7 +92,7 @@ export function buildSummaryMarkdown(insight: Insight, lang: Lang): string {
   if (insight.dates.length === 0) out.push(t.result.noDates, '');
   else {
     for (const d of insight.dates) {
-      const flag = d.foundInText === false ? ` (${t.result.notInText})` : '';
+      const flag = d.foundInText === false ? ` (${issueLabel(t, d.issue)})` : '';
       out.push(`- ${formatDate(d.date, locale)}: ${escapeMd(d.context)}${flag}`);
     }
     out.push('');

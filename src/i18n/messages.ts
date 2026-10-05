@@ -144,6 +144,11 @@ export const pl = {
       `Model: ${model}. Przeanalizowano ${when}${chunks > 1 ? `, w ${String(chunks)} częściach` : ''}${ocr ? `. Strony odczytane ze skanu: ${ocr}` : ''}.`,
     notInText: 'nie znaleziono w tekście',
     notInTextTitle: 'Tej wartości nie znaleziono w tekście dokumentu',
+    currencyMismatch: 'inna waluta w dokumencie',
+    currencyMismatchTitle: 'W dokumencie ta wartość występuje tylko z inną walutą',
+    fromInstruction: 'z podejrzanego polecenia',
+    fromInstructionTitle:
+      'Ta wartość występuje w dokumencie tylko w tekście wyglądającym na polecenie dla AI. Wynik mógł zostać zmanipulowany.',
     reanalyze: 'Przeanalizuj ten plik ponownie',
     next: 'Przeanalizuj kolejny plik',
   },
@@ -325,6 +330,11 @@ export const en: Messages = {
       `Model: ${model}. Analysed ${when}${chunks > 1 ? `, in ${String(chunks)} parts` : ''}${ocr ? `. Pages read from scans: ${ocr}` : ''}.`,
     notInText: 'not found in text',
     notInTextTitle: 'This value was not found in the document text',
+    currencyMismatch: 'different currency in document',
+    currencyMismatchTitle: 'In the document this value appears only with a different currency',
+    fromInstruction: 'from a suspicious instruction',
+    fromInstructionTitle:
+      'This value appears in the document only inside text that looks like an instruction to an AI. The result may have been manipulated.',
     reanalyze: 'Analyse this file again',
     next: 'Analyse another file',
   },
