@@ -38,7 +38,21 @@
 
 7. **Za duży bundle.** Pierwszy build miał 758 kB JS w jednym pliku. Naprawa: pdf.js ładowany dynamicznie przy pierwszym pliku (główny bundle ok. 100 kB gzip).
 
+## Przegląd krytyczny i przypadki brzegowe
+
+Po zbudowaniu pierwszej wersji poprosiłem: _„think of yourself as OP data engineer and web app developer. critique the repo and check its edge cases”_. Każde podejrzenie było najpierw potwierdzane testem, który nie przechodził, a dopiero potem poprawiane (osobny commit z testem regresyjnym). Do testów w przeglądarce wygenerowałem zestaw nietypowych PDF-ów (skan z nagłówkiem, JPEG 2000, pusta strona, paragon, hasło, uszkodzony plik, biały tekst). Znalezione i poprawione błędy:
+
+8. **Utrata danych ze skanów z nagłówkiem.** Skan, do którego skaner dodał linijkę tekstu, miał ponad 30 znaków, więc nie był renderowany i cała jego treść znikała bez ostrzeżenia. Teraz strona z obrazem i krótkim tekstem też jest traktowana jako skan.
+9. **Białe strony zamiast skanów JPEG 2000.** Nie skonfigurowałem `wasmUrl` w pdf.js, więc dekoder JPEG 2000 się nie ładował i model dostawał pusty obraz. Teraz dekodery WASM, CMapy i fonty pdf.js są publikowane z aplikacją, a puste rendery nie trafiają do modelu.
+10. **Błędna normalizacja.** `"Polish"` zamieniało się w kod `"po"` (przechodził walidację, ale był błędny), a `"12,345"` mogło stać się 12,345 zamiast 12 345. Teraz normalizowany jest tylko jednoznaczny zapis, reszta trafia do ponownej próby.
+11. **Licznik zdań** dzielił zdanie na `2027 r. 13 100 zł`, przez co poprawne podsumowania mogły być odrzucane.
+12. **Nazwa pliku w prompcie** była poza blokiem danych, więc plik nazwany jak polecenie dla AI był wektorem prompt injection. Nazwa pliku nie trafia już do modelu.
+13. **Heurystyka injection** nie wykrywała tekstu bez polskich znaków (`wczesniejsze`).
+14. **Budżet CPU Workera:** najgorsze żądanie (4 obrazy po 1,5 MB) kosztowało ok. 16–22 ms CPU na samo parsowanie i walidację, przy limicie 10 ms w darmowym planie. Zmniejszyłem limity i usunąłem kosztowny regex base64 (ok. 4–7 ms).
+15. **Limity darmowego API:** długi dokument dzielony na 8 fragmentów po 60 tys. znaków przekraczał limit zapytań na minutę. Teraz fragmenty mają 150 tys. znaków (maks. 4 wywołania), a HTTP 429 ma jedną próbę z odczekaniem czasu podanego przez dostawcę.
+16. **Drobniejsze:** `AbortSignal.any` nie działa na Safari przed 17.4; plik upuszczony obok strefy otwierał się zamiast aplikacji; licznik sekund w regionie `aria-live` był odczytywany co sekundę; błąd dostawcy AI (z treścią odpowiedzi) trafiał do klienta; po anulowaniu pdf.js dalej przetwarzał strony; brak CSP i fonty ładowane z Google.
+
 ## Weryfikacja
 
-- `npm run lint`, `npm run typecheck`, `npm test` (46 testów) i `npm run build` przechodzą bez błędów i ostrzeżeń.
-- Test end-to-end w headless Chromium na pliku testowym: odczyt 12 stron, strona 11 wyrenderowana do JPEG i wysłana do modelu, ostrzeżenie o instrukcji ze strony 4, brak poziomego przewijania przy 360 px, pobranie pliku `.json`, historia po przeładowaniu, komunikat błędu dla pliku, który nie jest PDF-em.
+- `npm run lint`, `npm run typecheck`, `npm test` (69 testów) i `npm run build` przechodzą bez błędów i ostrzeżeń.
+- Test end-to-end w headless Chromium na pliku testowym i na nietypowych PDF-ach (tabela w README): odczyt 12 stron, strona 11 wyrenderowana do JPEG i wysłana do modelu, ostrzeżenie o instrukcji ze strony 4, brak poziomego przewijania przy 360 px, pobranie pliku `.json`, historia po przeładowaniu, komunikat błędu dla pliku, który nie jest PDF-em.
