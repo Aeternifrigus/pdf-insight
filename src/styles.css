@@ -70,14 +70,12 @@ body {
 }
 
 /*
- * Cyfry tabelaryczne tylko tam, gdzie liczby są w kolumnach lub zmieniają się w miejscu.
- * Na całym body Schibsted Grotesk poszerza też przecinki i kropki (ok. 2,4×), co psuło
- * zwykły tekst ("184 500 ,00", "sp . z o.o .").
+ * Cyfry tabelaryczne tylko w liczniku sekund (bez drgania szerokości przy zmianie cyfr).
+ * W Schibsted Grotesk "tnum" poszerza też przecinki i kropki (ok. 2,4×), co psuło
+ * tekst i kwoty ("184 500 ,00", "sp . z o.o ."). Kolumna kwot jest wyrównana do lewej,
+ * więc cyfry tabelaryczne nic by w niej nie dały.
  */
-.amount,
-.timeline time,
-.progress-time,
-.json-code {
+.progress-time {
   font-variant-numeric: tabular-nums;
 }
 
