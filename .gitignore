@@ -8,3 +8,4 @@ worker/.dev.vars
 worker/.wrangler
 coverage
 .DS_Store
+public/pdfjs

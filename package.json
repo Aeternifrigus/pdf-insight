@@ -5,8 +5,10 @@
   "type": "module",
   "description": "PDF Insight: podsumowanie i ekstrakcja danych strukturalnych z plików PDF",
   "scripts": {
+    "predev": "node scripts/copy-pdfjs-assets.mjs",
     "dev": "vite",
     "dev:worker": "wrangler dev --config worker/wrangler.toml",
+    "prebuild": "node scripts/copy-pdfjs-assets.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",

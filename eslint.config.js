@@ -6,7 +6,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules', 'worker/.wrangler', 'coverage'] },
+  { ignores: ['dist', 'node_modules', 'worker/.wrangler', 'coverage', 'public/pdfjs'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.strictTypeChecked],
     files: ['**/*.{ts,tsx}'],
