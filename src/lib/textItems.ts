@@ -30,8 +30,8 @@ export function cleanText(text: string): string {
       .replace(/[\uFB00-\uFB06]/g, (ch) => LIGATURES[ch] ?? ch)
       .replace(/[\u00A0\u2007\u202F]/g, ' ')
       .replace(/[\u00AD\u200B-\u200D\u2060\uFEFF\u202A-\u202E\u2066-\u2069]/g, '')
-      // eslint-disable-next-line no-control-regex
-      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+      // Znaki kontrolne (kategoria Unicode Cc) poza tabulatorem i końcami wiersza.
+      .replace(/[^\P{Cc}\t\n\r]/gu, '')
   );
 }
 
