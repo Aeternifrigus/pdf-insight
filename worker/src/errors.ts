@@ -8,6 +8,7 @@ export type ErrorCode =
   | 'AI_RATE_LIMITED'
   | 'AI_UNAVAILABLE'
   | 'AI_TIMEOUT'
+  | 'AI_REFUSED'
   | 'INVALID_AI_RESPONSE'
   | 'MISCONFIGURED'
   | 'INTERNAL';
@@ -34,5 +35,13 @@ export class ProviderError extends Error {
   ) {
     super(message);
     this.name = 'ProviderError';
+  }
+}
+
+/** Odpowiedź modelu ucięta z powodu limitu długości (JSON jest wtedy niekompletny). */
+export class TruncatedResponseError extends Error {
+  constructor(public readonly partial: string) {
+    super('Odpowiedź modelu została ucięta (limit długości).');
+    this.name = 'TruncatedResponseError';
   }
 }

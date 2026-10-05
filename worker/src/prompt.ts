@@ -126,6 +126,10 @@ Return exactly one JSON object with only these keys:
 }`;
 }
 
+export function truncatedRetryPrompt(): string {
+  return 'Your previous answer was cut off because it was too long. Return the complete JSON object again, shorter: at most 15 amounts and 15 dates, contexts of at most 8 words. Do not add any other text.';
+}
+
 export function retryPrompt(issues: string[]): string {
   return `Your previous answer was not valid. Problems:\n${issues
     .slice(0, 20)

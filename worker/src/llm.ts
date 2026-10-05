@@ -1,5 +1,5 @@
 import type { Env } from './env';
-import { AppError, ProviderError } from './errors';
+import { AppError, ProviderError, TruncatedResponseError } from './errors';
 
 export interface LlmImage {
   page: number;
@@ -80,6 +80,17 @@ export function parseRetryAfter(header: string | null, body: string): number | n
   return m?.[1] ? Number(m[1]) * 1000 : null;
 }
 
+const BLOCK_REASONS = new Set([
+  'SAFETY',
+  'RECITATION',
+  'BLOCKLIST',
+  'PROHIBITED_CONTENT',
+  'SPII',
+  'IMAGE_SAFETY',
+  'LANGUAGE',
+  'OTHER',
+]);
+
 class GeminiClient implements LlmClient {
   constructor(
     private readonly apiKey: string,
@@ -126,11 +137,19 @@ class GeminiClient implements LlmClient {
         `Dostawca AI odrzucił dokument (${data.promptFeedback.blockReason}).`,
       );
     }
-    const parts = data.candidates?.[0]?.content?.parts ?? [];
-    return parts
+    const candidate = data.candidates?.[0];
+    const text = (candidate?.content?.parts ?? [])
       .filter((p) => !p.thought)
       .map((p) => p.text ?? '')
       .join('');
+    const reason = candidate?.finishReason ?? '';
+    // Filtry treści (np. RECITATION przy cytowaniu opublikowanych tekstów) zwracają pustą odpowiedź.
+    // Bez tej obsługi kończyło się to mylącym "niepoprawne dane" po dwóch próbach.
+    if (BLOCK_REASONS.has(reason)) {
+      throw new ProviderError(422, `Dostawca AI zablokował odpowiedź (${reason}).`);
+    }
+    if (reason === 'MAX_TOKENS') throw new TruncatedResponseError(text);
+    return text;
   }
 }
 
@@ -172,8 +191,14 @@ class OpenAiCompatibleClient implements LlmClient {
         max_tokens: 8192,
         response_format: { type: 'json_object' },
       },
-    )) as { choices?: { message?: { content?: string } }[] };
+    )) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
 
-    return data.choices?.[0]?.message?.content ?? '';
+    const choice = data.choices?.[0];
+    const text = choice?.message?.content ?? '';
+    if (choice?.finish_reason === 'content_filter') {
+      throw new ProviderError(422, 'Dostawca AI zablokował odpowiedź (content_filter).');
+    }
+    if (choice?.finish_reason === 'length') throw new TruncatedResponseError(text);
+    return text;
   }
 }

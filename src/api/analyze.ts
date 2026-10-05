@@ -108,7 +108,8 @@ export async function analyze(request: AnalyzeRequest, signal: AbortSignal): Pro
     const details = Array.isArray(err?.details)
       ? err.details.filter((d): d is string => typeof d === 'string')
       : [];
-    throw new ApiError(message, details, res.status !== 400 && res.status !== 413);
+    // 400, 413 i 422 (filtr treści) dadzą ten sam wynik przy ponowieniu.
+    throw new ApiError(message, details, ![400, 413, 422].includes(res.status));
   }
 
   // Walidacja przed wyświetleniem: frontend nie ufa ślepo backendowi.

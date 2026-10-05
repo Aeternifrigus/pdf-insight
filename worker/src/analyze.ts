@@ -12,7 +12,7 @@ import {
   type Insight,
   type ModelOutput,
 } from '../../src/lib/schema';
-import { AppError, ProviderError } from './errors';
+import { AppError, ProviderError, TruncatedResponseError } from './errors';
 import type { LlmClient, LlmImage, Turn } from './llm';
 import {
   documentBlock,
@@ -21,6 +21,7 @@ import {
   reduceSystemPrompt,
   retryPrompt,
   systemPrompt,
+  truncatedRetryPrompt,
 } from './prompt';
 
 /**
@@ -192,7 +193,23 @@ export async function callValidated<S extends z.ZodType>(
     try {
       raw = await llm.complete(system, turns);
     } catch (e) {
+      if (e instanceof TruncatedResponseError) {
+        // Ucięty JSON: zamiast ogólnego "popraw błędy" prosimy wprost o krótszą odpowiedź.
+        lastIssues = ['(root): the answer was cut off because it was too long'];
+        turns.push(
+          { role: 'model', text: e.partial.slice(0, 20_000) },
+          { role: 'user', text: truncatedRetryPrompt() },
+        );
+        continue;
+      }
       if (e instanceof ProviderError) {
+        if (e.status === 422) {
+          throw new AppError(
+            'AI_REFUSED',
+            422,
+            'Dostawca AI odmówił analizy tego dokumentu (filtr treści). Spróbuj innego pliku.',
+          );
+        }
         if (e.status === 429) {
           // Jedno krótkie odczekanie, jeśli dostawca podał czas i mieści się w budżecie.
           const wait = e.retryAfterMs ?? 5_000;

@@ -11,7 +11,7 @@ import {
 import type { Env } from './env';
 import { AppError, ProviderError } from './errors';
 import { handle } from './router';
-import { parseRetryAfter, type LlmClient, type Turn } from './llm';
+import { createLlm, parseRetryAfter, type LlmClient, type Turn } from './llm';
 import { neutralizeTags } from './prompt';
 
 class FakeLlm implements LlmClient {
@@ -229,6 +229,42 @@ describe('błędy dostawcy AI', () => {
     await expect(
       analyzeDocument(request, new FakeLlm([good]), undefined, 1000),
     ).rejects.toMatchObject({ code: 'AI_TIMEOUT' });
+  });
+});
+
+describe('odpowiedzi Gemini', () => {
+  const gemini = (body: unknown) =>
+    createLlm({ GEMINI_API_KEY: 'k' }, () =>
+      Promise.resolve(new Response(JSON.stringify(body), { status: 200 })),
+    );
+
+  it('blokadę filtra treści zgłasza jako odmowę, bez ponawiania', async () => {
+    const err = await analyzeDocument(
+      request,
+      gemini({ candidates: [{ finishReason: 'RECITATION', content: { parts: [] } }] }),
+    ).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: 'AI_REFUSED', status: 422 });
+  });
+
+  it('po uciętej odpowiedzi prosi o krótszy JSON', async () => {
+    let call = 0;
+    const seen: string[] = [];
+    const fetchFn = ((_url: string, init: RequestInit) => {
+      call++;
+      seen.push(typeof init.body === 'string' ? init.body : '');
+      const body =
+        call === 1
+          ? {
+              candidates: [
+                { finishReason: 'MAX_TOKENS', content: { parts: [{ text: '{"summ' }] } },
+              ],
+            }
+          : { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: good }] } }] };
+      return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+    }) as typeof fetch;
+    const result = await analyzeDocument(request, createLlm({ GEMINI_API_KEY: 'k' }, fetchFn));
+    expect(result.keyPoints.length).toBeGreaterThan(0);
+    expect(seen[1]).toContain('cut off because it was too long');
   });
 });
 
