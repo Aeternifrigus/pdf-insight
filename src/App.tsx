@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { analyze, ApiError, buildRequest, isApiConfigured } from './api/analyze';
+import {
+  analyze,
+  ApiError,
+  buildRequest,
+  isApiConfigured,
+  translate,
+  translateDocumentChunk,
+} from './api/analyze';
 import { ErrorPanel } from './components/ErrorPanel';
 import { HistoryPanel } from './components/HistoryPanel';
+import { LanguageSwitch } from './components/LanguageSwitch';
 import { ProgressPanel } from './components/ProgressPanel';
-import { ResultView } from './components/ResultView';
+import { ResultView, type ResultNote } from './components/ResultView';
 import { UploadZone } from './components/UploadZone';
-import { checkPdfFile, PdfReadError } from './lib/file';
+import { useI18n } from './i18n/context';
+import { describeError, FileCheckError } from './i18n/errors';
+import { translateWholeDocument, type ProgressEvent } from './lib/documentTranslation';
+import type { TranslatedDocument } from './lib/exportMarkdown';
+import { checkPdfFile, formatBytes, PdfReadError } from './lib/file';
 import {
   addToHistory,
   clearHistory,
@@ -14,25 +26,34 @@ import {
   HISTORY_KEY,
   loadHistory,
   removeFromHistory,
+  saveTranslation,
   type HistoryEntry,
 } from './lib/history';
-import type { Insight } from './lib/schema';
+import type { ExtractedPdf } from './lib/pdf';
+import type { Insight, OutputLanguage } from './lib/schema';
+
+/** Błąd jako dane: tekst powstaje przy wyświetlaniu, w bieżącym języku interfejsu. */
+type ErrorInfo = { error: unknown } | { code: 'NO_TEXT' };
 
 type Phase =
   | { kind: 'empty' }
   | { kind: 'reading'; fileName: string; done: number; total: number; startedAt: number }
   | { kind: 'analyzing'; fileName: string; startedAt: number }
-  | { kind: 'error'; message: string; details: string[]; retryFile: File | null }
+  | { kind: 'error'; info: ErrorInfo; retryFile: File | null }
   | {
       kind: 'result';
       insight: Insight;
-      notes: string[];
+      translations: Partial<Record<OutputLanguage, Insight>>;
+      notes: ResultNote[];
       historyId: string | null;
-      /** Plik, który można przeanalizować ponownie (wynik pochodzi z historii). */
-      cachedFile?: File;
+      /** Plik źródłowy (gdy wynik nie pochodzi tylko z historii): ponowna analiza i tłumaczenie całości. */
+      file?: File;
+      extracted?: ExtractedPdf;
+      fromCache?: boolean;
     };
 
 export default function App() {
+  const { t, locale } = useI18n();
   const [phase, setPhase] = useState<Phase>({ kind: 'empty' });
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
   const controller = useRef<AbortController | null>(null);
@@ -61,6 +82,18 @@ export default function App() {
     };
   }, []);
 
+  const errorMessage = useCallback(
+    (e: unknown): string => {
+      if (e instanceof FileCheckError) {
+        return e.code === 'TOO_LARGE'
+          ? t.errors.TOO_LARGE(formatBytes(e.size, locale))
+          : t.errors[e.code];
+      }
+      return describeError(t, locale, e);
+    },
+    [t, locale],
+  );
+
   const run = useCallback(async (file: File, force = false) => {
     controller.current?.abort();
     const ctrl = new AbortController();
@@ -72,7 +105,8 @@ export default function App() {
     // W międzyczasie użytkownik mógł wybrać inny plik.
     if (cancelled()) return;
     if (!check.ok) {
-      setPhase({ kind: 'error', message: check.message, details: [], retryFile: null });
+      const error = new FileCheckError(check.code, check.code === 'TOO_LARGE' ? check.size : 0);
+      setPhase({ kind: 'error', info: { error }, retryFile: null });
       return;
     }
 
@@ -84,9 +118,11 @@ export default function App() {
       setPhase({
         kind: 'result',
         insight: cached.insight,
-        notes: ['Ten plik był już analizowany. Pokazano zapisany wynik.'],
+        translations: cached.translations ?? {},
+        notes: [{ kind: 'cached' }],
         historyId: cached.id,
-        cachedFile: file,
+        file,
+        fromCache: true,
       });
       return;
     }
@@ -108,12 +144,7 @@ export default function App() {
 
       const hasText = pdf.pages.some((p) => p.text.trim().length > 0);
       if (!hasText && pdf.images.length === 0) {
-        setPhase({
-          kind: 'error',
-          message: 'W pliku nie ma tekstu do analizy.',
-          details: [],
-          retryFile: null,
-        });
+        setPhase({ kind: 'error', info: { code: 'NO_TEXT' }, retryFile: null });
         return;
       }
 
@@ -121,29 +152,21 @@ export default function App() {
       const insight = await analyze(buildRequest(file.name, pdf), ctrl.signal);
       if (cancelled()) return;
 
-      const notes = pdf.notes;
       const next = addToHistory(insight, undefined, fileHash);
       setHistory(next);
-      setPhase({ kind: 'result', insight, notes, historyId: next[0]?.id ?? null });
+      setPhase({
+        kind: 'result',
+        insight,
+        translations: {},
+        notes: pdf.notes,
+        historyId: next[0]?.id ?? null,
+        file,
+        extracted: pdf,
+      });
     } catch (e) {
       if (cancelled()) return;
-      if (e instanceof PdfReadError) {
-        setPhase({ kind: 'error', message: e.message, details: [], retryFile: null });
-      } else if (e instanceof ApiError) {
-        setPhase({
-          kind: 'error',
-          message: e.message,
-          details: e.details,
-          retryFile: e.retryable ? file : null,
-        });
-      } else {
-        setPhase({
-          kind: 'error',
-          message: 'Wystąpił nieoczekiwany błąd. Spróbuj ponownie.',
-          details: [],
-          retryFile: file,
-        });
-      }
+      const retryable = e instanceof ApiError ? e.retryable : !(e instanceof PdfReadError);
+      setPhase({ kind: 'error', info: { error: e }, retryFile: retryable ? file : null });
     }
   }, []);
 
@@ -152,22 +175,75 @@ export default function App() {
     setPhase({ kind: 'empty' });
   };
 
+  const result = phase.kind === 'result' ? phase : null;
+
+  /** Tłumaczenie wyniku: zapisywane w historii, żeby ponowne otwarcie nie zużywało limitu API. */
+  const translateResult = async (target: OutputLanguage, signal: AbortSignal): Promise<Insight> => {
+    if (!result) throw new Error('Brak wyniku');
+    const translated = await translate(result.insight, target, signal);
+    if (result.historyId) setHistory(saveTranslation(result.historyId, target, translated));
+    setPhase((p) =>
+      p.kind === 'result' && p.insight === result.insight
+        ? { ...p, translations: { ...p.translations, [target]: translated } }
+        : p,
+    );
+    return translated;
+  };
+
+  const translateDocument =
+    result && (result.extracted || result.file)
+      ? async (
+          target: OutputLanguage,
+          onProgress: (p: ProgressEvent) => void,
+          signal: AbortSignal,
+        ): Promise<TranslatedDocument> => {
+          let extracted = result.extracted;
+          if (!extracted && result.file) {
+            // Wynik z pamięci podręcznej: pełny tekst trzeba odczytać z pliku jeszcze raz.
+            const { extractPdf } = await import('./lib/pdf');
+            extracted = await extractPdf(result.file, undefined, signal);
+          }
+          if (!extracted) throw new Error('Brak tekstu dokumentu');
+          const out = await translateWholeDocument(
+            extracted,
+            result.insight.document.language,
+            target,
+            {
+              signal,
+              onProgress,
+              translateChunk: translateDocumentChunk,
+            },
+          );
+          return {
+            from: result.insight.document.language,
+            to: target,
+            model: out.model,
+            createdAt: new Date().toISOString(),
+            pages: out.pages,
+            issues: out.issues,
+            scannedPages: out.scannedPages,
+          };
+        }
+      : undefined;
+
   const busy = phase.kind === 'reading' || phase.kind === 'analyzing';
   const showUpload = phase.kind === 'empty' || phase.kind === 'error';
 
   return (
     <div className="app">
       <header className="masthead">
-        <h1>PDF Insight</h1>
-        <p>Wgraj PDF, a dostaniesz krótkie podsumowanie i dane gotowe do pobrania jako JSON.</p>
+        <div className="masthead-top">
+          <h1>PDF Insight</h1>
+          <LanguageSwitch />
+        </div>
+        <p>{t.appTagline}</p>
       </header>
 
       <main className="layout">
         <div className="main-col">
           {!isApiConfigured() && (
             <p className="config-warning" role="alert">
-              Brak adresu backendu (VITE_API_URL). Analiza nie zadziała, dopóki nie zostanie
-              skonfigurowany.
+              {t.configMissing}
             </p>
           )}
 
@@ -182,8 +258,12 @@ export default function App() {
 
           {phase.kind === 'error' && (
             <ErrorPanel
-              message={phase.message}
-              details={phase.details}
+              message={'code' in phase.info ? t.errors.NO_TEXT : errorMessage(phase.info.error)}
+              details={
+                'error' in phase.info && phase.info.error instanceof ApiError
+                  ? phase.info.error.details
+                  : []
+              }
               onReset={reset}
               onRetry={
                 phase.retryFile
@@ -214,15 +294,20 @@ export default function App() {
             />
           )}
 
-          {phase.kind === 'result' && (
+          {result && (
             <ResultView
-              insight={phase.insight}
-              notes={phase.notes}
+              key={result.historyId ?? result.insight.analysis.createdAt}
+              insight={result.insight}
+              translations={result.translations}
+              notes={result.notes}
+              onTranslate={translateResult}
+              translateDocument={translateDocument}
+              errorMessage={errorMessage}
               onReset={reset}
               onReanalyze={
-                phase.cachedFile
+                result.fromCache && result.file
                   ? () => {
-                      if (phase.cachedFile) void run(phase.cachedFile, true);
+                      if (result.file) void run(result.file, true);
                     }
                   : undefined
               }
@@ -230,20 +315,23 @@ export default function App() {
           )}
 
           {phase.kind === 'empty' && history.length === 0 && (
-            <p className="empty-hint">
-              Nie masz jeszcze żadnych analiz. Dobrze sprawdzają się umowy, faktury, oferty i
-              raporty.
-            </p>
+            <p className="empty-hint">{t.emptyHint}</p>
           )}
         </div>
 
         <aside className="side-col">
           <HistoryPanel
             entries={history}
-            activeId={phase.kind === 'result' ? phase.historyId : null}
+            activeId={result ? result.historyId : null}
             onOpen={(entry) => {
               controller.current?.abort();
-              setPhase({ kind: 'result', insight: entry.insight, notes: [], historyId: entry.id });
+              setPhase({
+                kind: 'result',
+                insight: entry.insight,
+                translations: entry.translations ?? {},
+                notes: [],
+                historyId: entry.id,
+              });
             }}
             onRemove={(id) => {
               setHistory(removeFromHistory(id));
@@ -257,12 +345,7 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <p>
-          Tekst pliku (oraz obrazy stron bez warstwy tekstowej) jest wysyłany do zewnętrznego
-          dostawcy AI (Google Gemini) w celu analizy. Sam plik PDF nie opuszcza przeglądarki. Demo
-          korzysta z darmowego planu API, w którym dostawca może wykorzystywać przesłane treści do
-          ulepszania swoich usług. Nie wgrywaj dokumentów poufnych ani danych osobowych.
-        </p>
+        <p>{t.footer}</p>
       </footer>
     </div>
   );

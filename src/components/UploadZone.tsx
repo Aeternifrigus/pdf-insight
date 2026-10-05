@@ -1,4 +1,5 @@
 import { useId, useRef, useState, type DragEvent } from 'react';
+import { useI18n } from '../i18n/context';
 
 interface Props {
   onFile: (file: File) => void;
@@ -6,6 +7,7 @@ interface Props {
 }
 
 export function UploadZone({ onFile, disabled = false }: Props) {
+  const { t } = useI18n();
   const inputId = useId();
   const hintId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -52,13 +54,10 @@ export function UploadZone({ onFile, disabled = false }: Props) {
         <path d="M32 2v14h14" />
         <path className="dropzone-icon-mark" d="M12 30h24M12 37h24M12 44h14" />
       </svg>
-      <span className="dropzone-title">
-        {dragging ? 'Upuść plik, aby rozpocząć analizę' : 'Przeciągnij tutaj plik PDF'}
-      </span>
-      <span className="dropzone-action">albo wybierz go z dysku</span>
+      <span className="dropzone-title">{dragging ? t.upload.dragging : t.upload.title}</span>
+      <span className="dropzone-action">{t.upload.action}</span>
       <span id={hintId} className="dropzone-hint">
-        PDF do 10 MB. Skany stron też zostaną odczytane. Treść pliku trafi do analizy w zewnętrznym
-        API AI.
+        {t.upload.hint}
       </span>
     </label>
   );

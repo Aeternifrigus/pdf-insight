@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useI18n } from '../i18n/context';
 
 export type Step = 'reading' | 'analyzing';
 
@@ -11,12 +12,7 @@ interface Props {
   onCancel: () => void;
 }
 
-const STEPS: { id: Step | 'upload' | 'result'; label: string }[] = [
-  { id: 'upload', label: 'Wgranie pliku' },
-  { id: 'reading', label: 'Odczyt tekstu' },
-  { id: 'analyzing', label: 'Analiza AI' },
-  { id: 'result', label: 'Wynik' },
-];
+const STEPS = ['upload', 'reading', 'analyzing', 'result'] as const;
 
 export function ProgressPanel({
   fileName,
@@ -26,6 +22,7 @@ export function ProgressPanel({
   startedAt,
   onCancel,
 }: Props) {
+  const { t } = useI18n();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => {
@@ -36,14 +33,14 @@ export function ProgressPanel({
     };
   }, []);
 
-  const current = STEPS.findIndex((s) => s.id === step);
+  const current = STEPS.indexOf(step);
   const seconds = Math.max(0, Math.floor((now - startedAt) / 1000));
   const detail =
     step === 'reading'
       ? pagesTotal
-        ? `Strona ${pagesDone ?? 0} z ${pagesTotal}`
-        : 'Otwieranie pliku'
-      : 'Model czyta dokument i wypełnia schemat danych';
+        ? t.progress.page(pagesDone ?? 0, pagesTotal)
+        : t.progress.opening
+      : t.progress.analyzing;
 
   return (
     <section className="panel progress" aria-labelledby="progress-title">
@@ -53,12 +50,12 @@ export function ProgressPanel({
       <ol className="steps">
         {STEPS.map((s, i) => (
           <li
-            key={s.id}
+            key={s}
             className={i < current ? 'is-done' : i === current ? 'is-active' : undefined}
             aria-current={i === current ? 'step' : undefined}
           >
             <span className="step-dot" aria-hidden="true" />
-            {s.label}
+            {t.progress.steps[s]}
           </li>
         ))}
       </ol>
@@ -75,7 +72,7 @@ export function ProgressPanel({
         </span>
       </p>
       <button type="button" className="button button-ghost" onClick={onCancel}>
-        Anuluj
+        {t.progress.cancel}
       </button>
     </section>
   );

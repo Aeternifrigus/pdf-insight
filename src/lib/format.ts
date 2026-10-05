@@ -1,24 +1,22 @@
-import type { Insight } from './schema';
-
-export const TYPE_LABELS: Record<Insight['document']['type'], string> = {
-  faktura: 'Faktura',
-  umowa: 'Umowa',
-  oferta: 'Oferta',
-  raport: 'Raport',
-  inne: 'Inny dokument',
-};
-
-export function formatMoney(value: number, currency: string): string {
+/**
+ * Formatowanie zależne od języka. Ten sam wynik w polskim widoku: "184 500,00 zł", "12 marca 2026";
+ * w angielskim: "PLN 184,500.00", "12 March 2026". `locale` to np. "pl-PL" albo "en-GB".
+ */
+export function formatMoney(value: number, currency: string, locale: string): string {
   try {
-    return new Intl.NumberFormat('pl-PL', { style: 'currency', currency }).format(value);
+    return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value);
   } catch {
-    return `${value.toLocaleString('pl-PL')} ${currency}`;
+    return `${formatNumber(value, locale)} ${currency}`;
   }
 }
 
-export function formatDate(iso: string): string {
+export function formatNumber(value: number, locale: string): string {
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
+}
+
+export function formatDate(iso: string, locale: string): string {
   const [y, m, d] = iso.split('-').map(Number) as [number, number, number];
-  return new Intl.DateTimeFormat('pl-PL', {
+  return new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -26,40 +24,44 @@ export function formatDate(iso: string): string {
   }).format(new Date(Date.UTC(y, m - 1, d)));
 }
 
-export function formatDateTime(iso: string): string {
-  return new Intl.DateTimeFormat('pl-PL', { dateStyle: 'medium', timeStyle: 'short' }).format(
+export function formatDateTime(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
     new Date(iso),
   );
 }
 
-export function languageName(code: string): string {
+/** Nazwa języka w języku interfejsu ("polski" / "Polish"). */
+export function languageName(code: string, uiLang: string): string {
   try {
-    const name = new Intl.DisplayNames(['pl'], { type: 'language' }).of(code);
-    return name ?? code;
+    return new Intl.DisplayNames([uiLang], { type: 'language' }).of(code) ?? code;
   } catch {
     return code;
   }
 }
 
-export function pagesLabel(n: number): string {
-  if (n === 1) return '1 strona';
-  const last = n % 10;
-  const lastTwo = n % 100;
-  if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) return `${n} strony`;
-  return `${n} stron`;
+export function fileBase(fileName: string): string {
+  return fileName.replace(/\.pdf$/i, '').replace(/[^\p{L}\p{N}._-]+/gu, '_') || 'dokument';
 }
 
-export function jsonFileName(fileName: string): string {
-  const base = fileName.replace(/\.pdf$/i, '').replace(/[^\p{L}\p{N}._-]+/gu, '_') || 'dokument';
-  return `${base}.insight.json`;
+/** Nazwy plików: oryginał bez sufiksu języka, tłumaczenie z sufiksem (np. umowa.insight.en.json). */
+export function jsonFileName(fileName: string, translatedTo?: string): string {
+  return `${fileBase(fileName)}.insight${translatedTo ? `.${translatedTo}` : ''}.json`;
 }
 
-export function downloadJson(insight: Insight): void {
-  const blob = new Blob([JSON.stringify(insight, null, 2)], { type: 'application/json' });
+export function summaryFileName(fileName: string, translatedTo?: string): string {
+  return `${fileBase(fileName)}.summary${translatedTo ? `.${translatedTo}` : ''}.md`;
+}
+
+export function documentTranslationFileName(fileName: string, lang: string): string {
+  return `${fileBase(fileName)}.${lang}.md`;
+}
+
+export function downloadText(content: string, fileName: string, mime: string): void {
+  const blob = new Blob([content], { type: `${mime};charset=utf-8` });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = jsonFileName(insight.document.fileName);
+  a.download = fileName;
   document.body.append(a);
   a.click();
   a.remove();

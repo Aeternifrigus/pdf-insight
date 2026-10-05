@@ -5,7 +5,6 @@ import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { PdfReadError } from './file';
 import { formFieldLines } from './forms';
-import { formatPageRanges } from './ranges';
 import {
   isBlankImage,
   MIN_TEXT_CHARS,
@@ -36,12 +35,18 @@ const IMAGE_OPS = new Set<number>([
   OPS.paintInlineImageXObjectGroup,
 ]);
 
+/** Uwaga o stronach jako dane; tekst powstaje w interfejsie w wybranym języku. */
+export type PdfNote =
+  | { kind: 'skipped'; pages: number[]; limit: number }
+  | { kind: 'failed'; pages: number[] }
+  | { kind: 'blank'; pages: number[] };
+
 export interface ExtractedPdf {
   pageCount: number;
   pages: { page: number; text: string }[];
   images: { page: number; mimeType: 'image/jpeg'; data: string }[];
   /** Uwagi dla użytkownika o stronach, których nie udało się w pełni odczytać. */
-  notes: string[];
+  notes: PdfNote[];
   /** Strony z treścią, która nie trafi do analizy (skany ponad limit, błędy odczytu). */
   unreadPages: number[];
 }
@@ -75,14 +80,14 @@ export async function extractPdf(
     void task.destroy();
     throwIfAborted(signal);
     if (e instanceof PasswordException) {
-      throw new PdfReadError('Plik jest zabezpieczony hasłem. Usuń hasło i spróbuj ponownie.');
+      throw new PdfReadError('PASSWORD');
     }
-    throw new PdfReadError('Nie udało się otworzyć pliku. Może być uszkodzony.');
+    throw new PdfReadError('CORRUPT');
   }
 
   try {
     if (pdf.numPages > 2000) {
-      throw new PdfReadError(`Plik ma ${pdf.numPages} stron. Limit to 2000 stron.`);
+      throw new PdfReadError('TOO_MANY_PAGES', { pages: pdf.numPages });
     }
 
     const pages: ExtractedPdf['pages'] = [];
@@ -116,9 +121,7 @@ export async function extractPdf(
       onProgress?.(n, pdf.numPages);
       // Przerywamy od razu, zamiast czytać setki kolejnych stron tylko po to, żeby odrzucić plik.
       if (totalChars > MAX_TEXT_CHARS) {
-        throw new PdfReadError(
-          `Dokument ma ponad ${MAX_TEXT_CHARS.toLocaleString('pl-PL')} znaków tekstu (przekroczone na stronie ${String(n)} z ${String(pdf.numPages)}). Spróbuj krótszego pliku.`,
-        );
+        throw new PdfReadError('TOO_MUCH_TEXT', { page: n, total: pdf.numPages });
       }
     }
 
@@ -142,20 +145,10 @@ export async function extractPdf(
       }
     }
 
-    const notes: string[] = [];
-    if (skipped.length > 0) {
-      notes.push(
-        `${pagesWord(skipped)} ${formatPageRanges(skipped)} wyglądają na skany i nie zostały odczytane (limit to ${String(MAX_IMAGES)} zeskanowane strony).`,
-      );
-    }
-    if (failed.length > 0) {
-      notes.push(
-        `Nie udało się odczytać: ${pagesWord(failed).toLowerCase()} ${formatPageRanges(failed)}.`,
-      );
-    }
-    if (blank.length > 0) {
-      notes.push(`${pagesWord(blank)} ${formatPageRanges(blank)} są puste i zostały pominięte.`);
-    }
+    const notes: PdfNote[] = [];
+    if (skipped.length > 0) notes.push({ kind: 'skipped', pages: skipped, limit: MAX_IMAGES });
+    if (failed.length > 0) notes.push({ kind: 'failed', pages: [...new Set(failed)] });
+    if (blank.length > 0) notes.push({ kind: 'blank', pages: blank });
 
     const unreadPages = [...new Set([...skipped, ...failed])].sort((a, b) => a - b);
     return { pageCount: pdf.numPages, pages, images, notes, unreadPages };
@@ -163,10 +156,6 @@ export async function extractPdf(
     signal?.removeEventListener('abort', onAbort);
     void task.destroy();
   }
-}
-
-function pagesWord(list: number[]): string {
-  return list.length === 1 ? 'Strona' : 'Strony';
 }
 
 async function pageText(page: PDFPageProxy): Promise<string> {

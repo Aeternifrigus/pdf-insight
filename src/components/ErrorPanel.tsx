@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useI18n } from '../i18n/context';
 
 interface Props {
   message: string;
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function ErrorPanel({ message, details, onRetry, onReset }: Props) {
+  const { t } = useI18n();
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     headingRef.current?.focus();
@@ -16,12 +18,12 @@ export function ErrorPanel({ message, details, onRetry, onReset }: Props) {
   return (
     <section className="panel error" role="alert" aria-labelledby="error-title">
       <h2 id="error-title" ref={headingRef} tabIndex={-1}>
-        Analiza się nie udała
+        {t.error.title}
       </h2>
       <p>{message}</p>
       {details.length > 0 && (
         <details className="error-details">
-          <summary>Szczegóły techniczne</summary>
+          <summary>{t.error.details}</summary>
           <ul>
             {details.map((d) => (
               <li key={d}>{d}</li>
@@ -32,11 +34,11 @@ export function ErrorPanel({ message, details, onRetry, onReset }: Props) {
       <div className="actions">
         {onRetry && (
           <button type="button" className="button button-primary" onClick={onRetry}>
-            Spróbuj ponownie
+            {t.error.retry}
           </button>
         )}
         <button type="button" className="button button-ghost" onClick={onReset}>
-          Wybierz inny plik
+          {t.error.chooseOther}
         </button>
       </div>
     </section>

@@ -8,6 +8,7 @@ import '@fontsource/schibsted-grotesk/700.css';
 import '@fontsource/schibsted-grotesk/800.css';
 import '@fontsource/jetbrains-mono/400.css';
 import App from './App';
+import { I18nProvider } from './i18n/I18nProvider';
 import './styles.css';
 
 const root = document.getElementById('root');
@@ -15,6 +16,8 @@ if (!root) throw new Error('Brak elementu #root');
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <I18nProvider>
+      <App />
+    </I18nProvider>
   </StrictMode>,
 );

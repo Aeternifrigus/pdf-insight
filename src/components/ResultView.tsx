@@ -1,82 +1,218 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useI18n } from '../i18n/context';
+import type { Lang } from '../i18n/messages';
+import type { ProgressEvent } from '../lib/documentTranslation';
 import {
+  buildSummaryMarkdown,
+  contentLanguage,
+  exportLanguage,
+  translationTarget,
+  type TranslatedDocument,
+} from '../lib/exportMarkdown';
+import {
+  downloadText,
   formatDate,
   formatDateTime,
   formatMoney,
+  jsonFileName,
   languageName,
-  pagesLabel,
-  TYPE_LABELS,
+  summaryFileName,
 } from '../lib/format';
-import type { Insight } from '../lib/schema';
+import type { PdfNote } from '../lib/pdf';
+import { formatPageRanges } from '../lib/ranges';
+import type { Insight, OutputLanguage } from '../lib/schema';
+import { DocumentTranslationPanel } from './DocumentTranslationPanel';
 import { JsonPreview } from './JsonPreview';
+
+export type ResultNote = PdfNote | { kind: 'cached' };
 
 interface Props {
   insight: Insight;
-  notes: string[];
+  translations: Partial<Record<OutputLanguage, Insight>>;
+  notes: ResultNote[];
+  onTranslate: (target: OutputLanguage, signal: AbortSignal) => Promise<Insight>;
+  /** Tłumaczenie całego dokumentu; brak = pełny tekst niedostępny (wynik z historii). */
+  translateDocument?: (
+    target: OutputLanguage,
+    onProgress: (p: ProgressEvent) => void,
+    signal: AbortSignal,
+  ) => Promise<TranslatedDocument>;
+  errorMessage: (e: unknown) => string;
   onReset: () => void;
   /** Ponowna analiza pliku, którego wynik pochodzi z historii. */
   onReanalyze?: () => void;
 }
 
-function NotInText() {
-  return (
-    <span className="not-in-text" title="Tej wartości nie znaleziono w tekście dokumentu">
-      nie znaleziono w tekście
-    </span>
-  );
+/** Lokal formatowania liczb dla języka treści: kwoty w angielskim tekście "PLN 184,500.00". */
+function contentLocale(lang: string): string {
+  if (lang === 'pl') return 'pl-PL';
+  if (lang === 'en') return 'en-GB';
+  return lang;
 }
 
-function Empty({ children }: { children: string }) {
-  return <p className="muted">{children}</p>;
-}
+type TranslateState = { kind: 'idle' } | { kind: 'loading' } | { kind: 'error'; message: string };
 
-export function ResultView({ insight, notes, onReset, onReanalyze }: Props) {
-  const { document: doc, analysis } = insight;
+export function ResultView({
+  insight,
+  translations,
+  notes,
+  onTranslate,
+  translateDocument,
+  errorMessage,
+  onReset,
+  onReanalyze,
+}: Props) {
+  const { t, lang, locale } = useI18n();
+  const target = translationTarget(insight.document.language);
+  const [view, setView] = useState<'original' | 'translated'>('original');
+  const [translateState, setTranslateState] = useState<TranslateState>({ kind: 'idle' });
+  const controller = useRef<AbortController | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+
+  // Stan widoku jest resetowany przez `key` w App (nowy wynik = nowa instancja komponentu).
   useEffect(() => {
     headingRef.current?.focus();
+    return () => controller.current?.abort();
   }, [insight]);
+
+  const translation = translations[target];
+  const shown = view === 'translated' && translation ? translation : insight;
+  const { document: doc, analysis } = shown;
+  const cLang = contentLanguage(shown);
+  const cLocale = contentLocale(cLang);
+  const tr = analysis.translation;
+
+  const showTranslated = async () => {
+    setView('translated');
+    if (translation) return;
+    controller.current?.abort();
+    const ctrl = new AbortController();
+    controller.current = ctrl;
+    setTranslateState({ kind: 'loading' });
+    try {
+      await onTranslate(target, ctrl.signal);
+      if (!ctrl.signal.aborted) setTranslateState({ kind: 'idle' });
+    } catch (e) {
+      if (ctrl.signal.aborted) return;
+      setTranslateState({ kind: 'error', message: errorMessage(e) });
+    }
+  };
+
+  const noteText = (n: ResultNote): string => {
+    if (n.kind === 'cached') return t.notes.cached;
+    const pages = formatPageRanges(n.pages);
+    if (n.kind === 'skipped') return t.notes.skipped(pages, n.pages.length, n.limit);
+    if (n.kind === 'failed') return t.notes.failed(pages, n.pages.length);
+    return t.notes.blank(pages, n.pages.length);
+  };
+  const warnings = [...analysis.warnings, ...notes.map(noteText)];
+  const translatedTo = tr ? tr.to : undefined;
+  const exportLang: Lang = exportLanguage(shown, lang);
 
   return (
     <article className="result" aria-labelledby="result-title">
       <header className="result-head">
         <p className="result-file">{doc.fileName}</p>
-        <h2 id="result-title" ref={headingRef} tabIndex={-1}>
+        <h2 id="result-title" ref={headingRef} tabIndex={-1} lang={cLang}>
           {doc.title ?? doc.fileName}
         </h2>
         <dl className="facts">
           <div>
-            <dt>Typ</dt>
-            <dd>{TYPE_LABELS[doc.type]}</dd>
+            <dt>{t.result.type}</dt>
+            <dd>{t.types[doc.type]}</dd>
           </div>
           <div>
-            <dt>Data</dt>
-            <dd>{doc.date ? formatDate(doc.date) : 'nie podano'}</dd>
+            <dt>{t.result.date}</dt>
+            <dd>{doc.date ? formatDate(doc.date, locale) : t.result.notGiven}</dd>
           </div>
           <div>
-            <dt>Objętość</dt>
-            <dd>{pagesLabel(doc.pages)}</dd>
+            <dt>{t.result.size}</dt>
+            <dd>{t.pages(doc.pages)}</dd>
           </div>
           <div className={analysis.unreadPages.length > 0 ? 'fact-warn' : undefined}>
-            <dt>Przeanalizowano</dt>
+            <dt>{t.result.analysed}</dt>
             <dd>
               {analysis.unreadPages.length > 0
-                ? `${String(doc.pages - analysis.unreadPages.length)} z ${String(doc.pages)} stron`
-                : 'cały dokument'}
+                ? t.result.partial(doc.pages - analysis.unreadPages.length, doc.pages)
+                : t.result.wholeDocument}
             </dd>
           </div>
           <div>
-            <dt>Język</dt>
-            <dd>{languageName(doc.language)}</dd>
+            <dt>{t.result.language}</dt>
+            <dd>{languageName(doc.language, lang)}</dd>
           </div>
         </dl>
       </header>
 
-      {(analysis.warnings.length > 0 || notes.length > 0) && (
-        <aside className="warnings" aria-label="Ostrzeżenia">
-          <h3>Na co uważać</h3>
+      <div className="view-switch" role="group" aria-label={t.view.label}>
+        <span className="view-switch-label" aria-hidden="true">
+          {t.view.label}
+        </span>
+        <button
+          type="button"
+          aria-pressed={view === 'original'}
+          onClick={() => {
+            controller.current?.abort();
+            setTranslateState({ kind: 'idle' });
+            setView('original');
+          }}
+        >
+          {t.view.original(languageName(insight.document.language, lang))}
+        </button>
+        <button
+          type="button"
+          lang={target}
+          aria-pressed={view === 'translated'}
+          onClick={() => void showTranslated()}
+        >
+          {t.languageNames[target]}
+        </button>
+      </div>
+
+      {view === 'translated' && translateState.kind === 'loading' && (
+        <p className="progress-status" role="status" aria-live="polite">
+          <span className="spinner" aria-hidden="true" />
+          {t.view.translating}
+        </p>
+      )}
+      {view === 'translated' && translateState.kind === 'error' && (
+        <div className="inline-error" role="alert">
+          <p>
+            {t.view.translationFailed} {translateState.message}
+          </p>
+          <button
+            type="button"
+            className="button button-ghost"
+            onClick={() => void showTranslated()}
+          >
+            {t.error.retry}
+          </button>
+        </div>
+      )}
+
+      {tr && (
+        <aside className={tr.numbersVerified ? 'translation-note' : 'translation-note is-warn'}>
+          <p>{t.view.machineTranslation(languageName(tr.from, lang), tr.model)}</p>
+          {tr.numbersVerified ? (
+            <p>{t.view.numbersVerified}</p>
+          ) : (
+            <>
+              <p>{t.view.numbersNotVerified}</p>
+              <ul>
+                {tr.issues.map((i, n) => (
+                  <li key={`${String(n)}-${i.field}`}>{t.view.issue(i)}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </aside>
+      )}
+
+      {warnings.length > 0 && (
+        <aside className="warnings" aria-label={t.result.warnings}>
+          <h3>{t.result.warnings}</h3>
           <ul>
-            {[...analysis.warnings, ...notes].map((w, i) => (
+            {warnings.map((w, i) => (
               <li key={`${String(i)}-${w}`}>{w}</li>
             ))}
           </ul>
@@ -84,16 +220,16 @@ export function ResultView({ insight, notes, onReset, onReanalyze }: Props) {
       )}
 
       <section className="block" aria-labelledby="summary-title">
-        <h3 id="summary-title">Podsumowanie</h3>
-        <p className="summary" lang={doc.language}>
-          {insight.summary}
+        <h3 id="summary-title">{t.result.summary}</h3>
+        <p className="summary" lang={cLang}>
+          {shown.summary}
         </p>
       </section>
 
       <section className="block" aria-labelledby="points-title">
-        <h3 id="points-title">Najważniejsze punkty</h3>
-        <ul className="points" lang={doc.language}>
-          {insight.keyPoints.map((p, i) => (
+        <h3 id="points-title">{t.result.keyPoints}</h3>
+        <ul className="points" lang={cLang}>
+          {shown.keyPoints.map((p, i) => (
             <li key={`${String(i)}-${p}`}>{p}</li>
           ))}
         </ul>
@@ -101,32 +237,36 @@ export function ResultView({ insight, notes, onReset, onReanalyze }: Props) {
 
       <div className="grid">
         <section className="block" aria-labelledby="amounts-title">
-          <h3 id="amounts-title">Kwoty ({insight.amounts.length})</h3>
-          {insight.amounts.length === 0 ? (
-            <Empty>Dokument nie zawiera kwot.</Empty>
+          <h3 id="amounts-title">{t.result.amounts(shown.amounts.length)}</h3>
+          {shown.amounts.length === 0 ? (
+            <p className="muted">{t.result.noAmounts}</p>
           ) : (
             <div
               className="table-wrap"
               tabIndex={0}
               role="region"
-              aria-label="Tabela kwot (przewijana)"
+              aria-label={t.result.amountsTable}
             >
               <table className="amounts">
                 <thead>
                   <tr>
-                    <th scope="col">Kwota</th>
-                    <th scope="col">Czego dotyczy</th>
+                    <th scope="col">{t.result.amount}</th>
+                    <th scope="col">{t.result.concerns}</th>
                   </tr>
                 </thead>
-                <tbody lang={doc.language}>
-                  {insight.amounts.map((a, i) => (
+                <tbody lang={cLang}>
+                  {shown.amounts.map((a, i) => (
                     <tr key={`${String(i)}-${a.currency}-${String(a.value)}`}>
                       <td className="amount">
-                        <mark>{formatMoney(a.value, a.currency)}</mark>
+                        <mark>{formatMoney(a.value, a.currency, cLocale)}</mark>
                       </td>
                       <td>
                         {a.context}
-                        {a.foundInText === false && <NotInText />}
+                        {a.foundInText === false && (
+                          <span className="not-in-text" title={t.result.notInTextTitle} lang={lang}>
+                            {t.result.notInText}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -137,17 +277,21 @@ export function ResultView({ insight, notes, onReset, onReanalyze }: Props) {
         </section>
 
         <section className="block" aria-labelledby="dates-title">
-          <h3 id="dates-title">Daty ({insight.dates.length})</h3>
-          {insight.dates.length === 0 ? (
-            <Empty>Dokument nie zawiera dat.</Empty>
+          <h3 id="dates-title">{t.result.dates(shown.dates.length)}</h3>
+          {shown.dates.length === 0 ? (
+            <p className="muted">{t.result.noDates}</p>
           ) : (
-            <ol className="timeline" lang={doc.language}>
-              {insight.dates.map((d, i) => (
+            <ol className="timeline" lang={cLang}>
+              {shown.dates.map((d, i) => (
                 <li key={`${String(i)}-${d.date}`}>
-                  <time dateTime={d.date}>{formatDate(d.date)}</time>
+                  <time dateTime={d.date}>{formatDate(d.date, cLocale)}</time>
                   <span>
                     {d.context}
-                    {d.foundInText === false && <NotInText />}
+                    {d.foundInText === false && (
+                      <span className="not-in-text" title={t.result.notInTextTitle} lang={lang}>
+                        {t.result.notInText}
+                      </span>
+                    )}
                   </span>
                 </li>
               ))}
@@ -158,24 +302,24 @@ export function ResultView({ insight, notes, onReset, onReanalyze }: Props) {
 
       <div className="grid">
         <section className="block" aria-labelledby="orgs-title">
-          <h3 id="orgs-title">Organizacje</h3>
-          {insight.entities.organizations.length === 0 ? (
-            <Empty>Brak nazw organizacji.</Empty>
+          <h3 id="orgs-title">{t.result.organisations}</h3>
+          {shown.entities.organizations.length === 0 ? (
+            <p className="muted">{t.result.noOrganisations}</p>
           ) : (
             <ul className="plain">
-              {insight.entities.organizations.map((o, i) => (
+              {shown.entities.organizations.map((o, i) => (
                 <li key={`${String(i)}-${o}`}>{o}</li>
               ))}
             </ul>
           )}
           <h3 id="people-title" className="subhead">
-            Osoby
+            {t.result.people}
           </h3>
-          {insight.entities.people.length === 0 ? (
-            <Empty>Brak nazwisk.</Empty>
+          {shown.entities.people.length === 0 ? (
+            <p className="muted">{t.result.noPeople}</p>
           ) : (
             <ul className="plain">
-              {insight.entities.people.map((p, i) => (
+              {shown.entities.people.map((p, i) => (
                 <li key={`${String(i)}-${p}`}>{p}</li>
               ))}
             </ul>
@@ -183,37 +327,68 @@ export function ResultView({ insight, notes, onReset, onReanalyze }: Props) {
         </section>
 
         <section className="block" aria-labelledby="keywords-title">
-          <h3 id="keywords-title">Słowa kluczowe</h3>
-          {insight.keywords.length === 0 ? (
-            <Empty>Brak słów kluczowych.</Empty>
+          <h3 id="keywords-title">{t.result.keywords}</h3>
+          {shown.keywords.length === 0 ? (
+            <p className="muted">{t.result.noKeywords}</p>
           ) : (
-            <ul className="tags" lang={doc.language}>
-              {insight.keywords.map((k, i) => (
+            <ul className="tags" lang={cLang}>
+              {shown.keywords.map((k, i) => (
                 <li key={`${String(i)}-${k}`}>{k}</li>
               ))}
             </ul>
           )}
           <p className="meta">
-            Model: {analysis.model}. Przeanalizowano {formatDateTime(analysis.createdAt)}
-            {analysis.chunks > 1 ? `, w ${analysis.chunks} częściach` : ''}
-            {analysis.ocrPages.length > 0
-              ? `. Strony odczytane ze skanu: ${analysis.ocrPages.join(', ')}`
-              : ''}
-            .
+            {t.result.meta(
+              analysis.model,
+              formatDateTime(analysis.createdAt, locale),
+              analysis.chunks,
+              analysis.ocrPages.length > 0 ? formatPageRanges(analysis.ocrPages) : '',
+            )}
           </p>
         </section>
       </div>
 
-      <JsonPreview insight={insight} />
+      <section className="downloads" aria-labelledby="downloads-title">
+        <h3 id="downloads-title">{t.downloads.title}</h3>
+        <div className="actions">
+          <button
+            type="button"
+            className="button button-ghost"
+            onClick={() => {
+              downloadText(
+                buildSummaryMarkdown(shown, exportLang),
+                summaryFileName(doc.fileName, translatedTo),
+                'text/markdown',
+              );
+            }}
+          >
+            {t.downloads.summary(cLang.toUpperCase())}
+          </button>
+        </div>
+      </section>
+
+      <JsonPreview insight={shown} fileName={jsonFileName(doc.fileName, translatedTo)} />
+
+      <DocumentTranslationPanel
+        fileName={insight.document.fileName}
+        title={(translation ?? insight).document.title}
+        target={target}
+        run={
+          translateDocument
+            ? (onProgress, signal) => translateDocument(target, onProgress, signal)
+            : undefined
+        }
+        errorMessage={errorMessage}
+      />
 
       <div className="actions result-actions">
         {onReanalyze && (
           <button type="button" className="button button-primary" onClick={onReanalyze}>
-            Przeanalizuj ten plik ponownie
+            {t.result.reanalyze}
           </button>
         )}
         <button type="button" className="button button-ghost" onClick={onReset}>
-          Przeanalizuj kolejny plik
+          {t.result.next}
         </button>
       </div>
     </article>

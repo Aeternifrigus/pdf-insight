@@ -112,7 +112,139 @@ h3 {
 /* Nagłówek: nazwa jako znak, bez ozdobników */
 .masthead {
   margin-bottom: 2rem;
+}
+
+.masthead-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Przełączniki języka: interfejsu (nagłówek) i wyniku (widok wyniku) */
+.lang-switch,
+.view-switch {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.lang-switch button,
+.view-switch button {
+  min-height: 2.5rem;
+  padding: 0.35rem 0.9rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  background: transparent;
+  border: 2px solid var(--ink);
+  cursor: pointer;
+}
+
+.lang-switch button + button,
+.view-switch button + button {
+  margin-left: -2px;
+}
+
+.lang-switch button:first-child,
+.view-switch button:first-of-type {
+  border-radius: 6px 0 0 6px;
+}
+
+.lang-switch button:last-child,
+.view-switch button:last-of-type {
+  border-radius: 0 6px 6px 0;
+}
+
+.lang-switch button[aria-pressed='true'],
+.view-switch button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.lang-switch button[aria-pressed='false']:hover,
+.view-switch button[aria-pressed='false']:hover {
+  background: var(--marker);
+  color: var(--marker-ink);
+}
+
+.view-switch-label {
+  margin-right: 0.75rem;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+
+.translation-note {
+  padding: 0.75rem 1rem;
+  border-left: 6px solid var(--ink);
+  background: var(--sheet);
+  border-radius: 4px;
+  font-size: var(--step--1);
+}
+
+.translation-note.is-warn {
+  border-left-color: var(--danger);
+}
+
+.translation-note p {
+  margin: 0;
+}
+
+.translation-note p + p,
+.translation-note ul {
+  margin-top: 0.35rem;
+}
+
+.translation-note ul {
+  margin-bottom: 0;
+  padding-left: 1.2rem;
+}
+
+.downloads h3,
+.doc-translation h3 {
+  font-size: var(--step-1);
+}
+
+.downloads .actions {
+  margin-top: 0.6rem;
+}
+
+.doc-translation {
+  padding: 1.25rem;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+}
+
+.doc-translation .muted {
+  margin-top: 0.4rem;
   max-width: 44rem;
+}
+
+.doc-translation .progress-status {
+  margin: 0;
+}
+
+.inline-error,
+.inline-warn {
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.9rem;
+  border-radius: 4px;
+}
+
+.inline-error {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.inline-error p {
+  margin: 0 0 0.5rem;
+}
+
+.inline-warn {
+  background: var(--warn-bg);
 }
 
 .masthead h1 {
@@ -122,6 +254,7 @@ h3 {
 }
 
 .masthead p {
+  max-width: 44rem;
   margin: 0.5rem 0 0;
   color: var(--ink-soft);
   font-size: var(--step-1);

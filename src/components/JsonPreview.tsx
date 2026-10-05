@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { downloadJson, jsonFileName } from '../lib/format';
+import { useI18n } from '../i18n/context';
+import { downloadText } from '../lib/format';
 import type { Insight } from '../lib/schema';
 
 /** Prosta kolorystyka składni budowana z elementów React (bez innerHTML). */
@@ -36,7 +37,8 @@ function highlight(json: string): ReactNode[] {
   return out;
 }
 
-export function JsonPreview({ insight }: { insight: Insight }) {
+export function JsonPreview({ insight, fileName }: { insight: Insight; fileName: string }) {
+  const { t } = useI18n();
   const json = useMemo(() => JSON.stringify(insight, null, 2), [insight]);
   const nodes = useMemo(() => highlight(json), [json]);
   const [copied, setCopied] = useState(false);
@@ -56,23 +58,23 @@ export function JsonPreview({ insight }: { insight: Insight }) {
   return (
     <section className="json" aria-labelledby="json-title">
       <div className="json-head">
-        <h3 id="json-title">Dane JSON</h3>
+        <h3 id="json-title">{t.json.title}</h3>
         <div className="actions">
           <button type="button" className="button button-ghost" onClick={() => void copy()}>
-            {copied ? 'Skopiowano' : 'Kopiuj'}
+            {copied ? t.json.copied : t.json.copy}
           </button>
           <button
             type="button"
             className="button button-primary"
             onClick={() => {
-              downloadJson(insight);
+              downloadText(json, fileName, 'application/json');
             }}
           >
-            Pobierz {jsonFileName(insight.document.fileName)}
+            {t.json.download(fileName)}
           </button>
         </div>
       </div>
-      <pre className="json-code" tabIndex={0} aria-label="Podgląd danych JSON">
+      <pre className="json-code" tabIndex={0} aria-label={t.json.preview}>
         <code>{nodes}</code>
       </pre>
     </section>
