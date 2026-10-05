@@ -16,5 +16,11 @@ name = "RATE_LIMITER"
 namespace_id = "1001"
 simple = { limit = 10, period = 60 }
 
+# Osobny limit dla tłumaczeń: tłumaczenie całego dokumentu to kilkanaście krótkich żądań.
+[[ratelimits]]
+name = "RATE_LIMITER_TRANSLATE"
+namespace_id = "1002"
+simple = { limit = 30, period = 60 }
+
 [observability]
 enabled = true

@@ -32,12 +32,26 @@ export class MemoryRateLimiter {
   }
 }
 
-const memoryLimiter = new MemoryRateLimiter(8, 60_000);
+/**
+ * Analiza i tłumaczenie mają osobne limity: tłumaczenie całego dokumentu to kilkanaście
+ * krótkich żądań jednego użytkownika i nie może blokować jego kolejnej analizy (i odwrotnie).
+ */
+export type LimitScope = 'analyze' | 'translate';
 
-export async function isAllowed(env: Env, key: string): Promise<boolean> {
-  if (!memoryLimiter.allow(key)) return false;
-  if (env.RATE_LIMITER) {
-    const { success } = await env.RATE_LIMITER.limit({ key });
+const memoryLimiters: Record<LimitScope, MemoryRateLimiter> = {
+  analyze: new MemoryRateLimiter(8, 60_000),
+  translate: new MemoryRateLimiter(20, 60_000),
+};
+
+export async function isAllowed(
+  env: Env,
+  key: string,
+  scope: LimitScope = 'analyze',
+): Promise<boolean> {
+  if (!memoryLimiters[scope].allow(key)) return false;
+  const binding = scope === 'analyze' ? env.RATE_LIMITER : env.RATE_LIMITER_TRANSLATE;
+  if (binding) {
+    const { success } = await binding.limit({ key });
     return success;
   }
   return true;

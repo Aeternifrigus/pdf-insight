@@ -104,6 +104,36 @@ export const entitiesSchema = z.object({
 });
 
 /** Pole dodatkowe (brief pozwala dodawać pola): metadane analizy. */
+/** Języki, na które można przetłumaczyć wynik (i języki interfejsu). */
+export const OUTPUT_LANGUAGES = ['pl', 'en'] as const;
+export type OutputLanguage = (typeof OUTPUT_LANGUAGES)[number];
+
+const languageCode = z.string().regex(/^[a-z]{2}$/, { message: 'Kod ISO 639-1' });
+
+/** Problem z liczbami w jednym przetłumaczonym polu (lub na jednej stronie dokumentu). */
+export const numericIssueSchema = z.object({
+  field: nonEmpty,
+  missing: z.array(z.string()),
+  extra: z.array(z.string()),
+  wrongFormat: z.array(z.string()),
+});
+export type NumericIssue = z.infer<typeof numericIssueSchema>;
+
+/**
+ * Pole dodatkowe w tłumaczeniu wyniku. `document.language` nadal opisuje język dokumentu,
+ * a teksty (podsumowanie, punkty, opisy kwot i dat) są w języku `to`.
+ */
+export const translationMetaSchema = z.object({
+  from: languageCode,
+  to: z.enum(OUTPUT_LANGUAGES),
+  model: nonEmpty,
+  createdAt: z.string(),
+  /** Czy liczby i daty w przetłumaczonych tekstach zgadzają się z oryginałem. */
+  numbersVerified: z.boolean(),
+  issues: z.array(numericIssueSchema),
+});
+export type TranslationMeta = z.infer<typeof translationMetaSchema>;
+
 export const analysisMetaSchema = z.object({
   model: nonEmpty,
   createdAt: z.string(),
@@ -112,6 +142,7 @@ export const analysisMetaSchema = z.object({
   /** Strony, których treść nie trafiła do analizy (skany ponad limit, błędy odczytu). */
   unreadPages: z.array(z.number().int().min(1)).default([]),
   warnings: z.array(nonEmpty),
+  translation: translationMetaSchema.optional(),
 });
 
 export const insightSchema = z.object({
@@ -220,6 +251,80 @@ export const analyzeRequestSchema = z
     }
   });
 export type AnalyzeRequest = z.infer<typeof analyzeRequestSchema>;
+
+/** Teksty wyniku, które są tłumaczone. Liczby, waluty i daty nigdy nie trafiają do tłumaczenia. */
+export const translatableTextsSchema = z.object({
+  title: z.string().trim().min(1).nullable(),
+  summary: summarySchema,
+  keyPoints: z.array(nonEmpty),
+  amountContexts: z.array(nonEmpty),
+  dateContexts: z.array(nonEmpty),
+  keywords: z.array(nonEmpty),
+  warnings: z.array(nonEmpty),
+});
+export type TranslatableTexts = z.infer<typeof translatableTextsSchema>;
+
+export const translateRequestSchema = z.object({
+  target: z.enum(OUTPUT_LANGUAGES),
+  insight: insightSchema.refine((i) => !i.analysis.translation, {
+    message: 'Wynik jest już tłumaczeniem',
+  }),
+});
+export type TranslateRequest = z.infer<typeof translateRequestSchema>;
+
+/** Tłumaczenie całego dokumentu odbywa się fragmentami (każdy fragment to osobne żądanie). */
+export const MAX_TRANSLATE_CHUNK_CHARS = 12_000;
+export const MAX_TRANSLATE_CHUNK_IMAGES = 2;
+/** Górny limit tekstu całego dokumentu do tłumaczenia (ok. 50 stron, kilkanaście żądań). */
+export const MAX_TRANSLATE_DOCUMENT_CHARS = 120_000;
+
+export const translateDocumentRequestSchema = z
+  .object({
+    target: z.enum(OUTPUT_LANGUAGES),
+    sourceLanguage: languageCode,
+    pages: z
+      .array(
+        z.object({
+          page: z.number().int().min(1),
+          text: z.string().max(MAX_TRANSLATE_CHUNK_CHARS),
+        }),
+      )
+      .min(1)
+      .max(60)
+      .refine((p) => p.reduce((n, x) => n + x.text.length, 0) <= MAX_TRANSLATE_CHUNK_CHARS, {
+        message: 'Fragment jest zbyt długi',
+      }),
+    images: z
+      .array(
+        z.object({
+          page: z.number().int().min(1),
+          mimeType: z.literal('image/jpeg'),
+          data: z.string().min(1).max(MAX_IMAGE_BASE64_CHARS),
+        }),
+      )
+      .max(MAX_TRANSLATE_CHUNK_IMAGES),
+  })
+  .superRefine((req, ctx) => {
+    const pages = req.pages.map((p) => p.page);
+    if (new Set(pages).size !== pages.length) {
+      ctx.addIssue({ code: 'custom', path: ['pages'], message: 'Powtórzone strony' });
+    }
+    if (req.images.some((i) => !pages.includes(i.page))) {
+      ctx.addIssue({ code: 'custom', path: ['images'], message: 'Obraz spoza fragmentu' });
+    }
+  });
+export type TranslateDocumentRequest = z.infer<typeof translateDocumentRequestSchema>;
+
+export const translatedPagesSchema = z.object({
+  pages: z.array(z.object({ page: z.number().int().min(1), text: z.string() })),
+});
+
+export const translateDocumentResponseSchema = z.object({
+  pages: z.array(z.object({ page: z.number().int().min(1), text: z.string() })),
+  issues: z.array(numericIssueSchema),
+  model: nonEmpty,
+});
+export type TranslateDocumentResponse = z.infer<typeof translateDocumentResponseSchema>;
 
 /** Czytelna lista błędów walidacji (do komunikatów i do ponownej próby modelu). */
 export function formatIssues(error: z.ZodError): string[] {

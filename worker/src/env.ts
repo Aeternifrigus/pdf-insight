@@ -10,4 +10,6 @@ export interface Env {
   ALLOWED_ORIGINS?: string;
   /** Opcjonalny binding Cloudflare Rate Limiting (patrz wrangler.toml). */
   RATE_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> };
+  /** Osobny limit dla tłumaczeń (tłumaczenie dokumentu to wiele krótkich żądań). */
+  RATE_LIMITER_TRANSLATE?: { limit(options: { key: string }): Promise<{ success: boolean }> };
 }

@@ -1,13 +1,63 @@
-import { analyzeRequestSchema, formatIssues } from '../../src/lib/schema';
+import type { z } from 'zod';
+import {
+  analyzeRequestSchema,
+  formatIssues,
+  translateDocumentRequestSchema,
+  translateRequestSchema,
+} from '../../src/lib/schema';
 import { analyzeDocument } from './analyze';
 import type { Env } from './env';
 import { AppError } from './errors';
 import { corsHeaders, errorResponse, json, parseAllowedOrigins, readBodyLimited } from './http';
 import { createLlm } from './llm';
-import { isAllowed } from './rateLimit';
+import { isAllowed, type LimitScope } from './rateLimit';
+import { translateDocumentChunk, translateInsight } from './translate';
 
 /** Tekst (maks. 400 tys. znaków, do ok. 1 MB w UTF-8) + do 4 obrazów po maks. 600 tys. znaków base64. */
 export const MAX_BODY_BYTES = 4 * 1024 * 1024;
+
+function parse<S extends z.ZodType>(schema: S, body: unknown): z.infer<S> {
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    throw new AppError(
+      'BAD_REQUEST',
+      400,
+      'Nieprawidłowe dane żądania.',
+      formatIssues(parsed.error),
+    );
+  }
+  return parsed.data;
+}
+
+interface Route {
+  scope: LimitScope;
+  /** `llm` jest tworzony dopiero po walidacji treści: błędne żądanie ma dostać 400, nie 500. */
+  run: (body: unknown, llm: () => ReturnType<typeof createLlm>) => Promise<unknown>;
+}
+
+const ROUTES: Record<string, Route | undefined> = {
+  '/analyze': {
+    scope: 'analyze',
+    run: (body, llm) => {
+      const req = parse(analyzeRequestSchema, body);
+      return analyzeDocument(req, llm());
+    },
+  },
+  '/translate': {
+    scope: 'translate',
+    run: (body, llm) => {
+      const req = parse(translateRequestSchema, body);
+      return translateInsight(req.insight, req.target, llm());
+    },
+  },
+  '/translate-document': {
+    scope: 'translate',
+    run: (body, llm) => {
+      const req = parse(translateDocumentRequestSchema, body);
+      return translateDocumentChunk(req, llm());
+    },
+  },
+};
 
 export async function handle(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
@@ -29,7 +79,8 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       return json({ ok: true }, 200, cors);
     }
 
-    if (url.pathname !== '/analyze') {
+    const route = ROUTES[url.pathname];
+    if (!route) {
       throw new AppError('NOT_FOUND', 404, 'Nie znaleziono.');
     }
     if (request.method !== 'POST') {
@@ -44,11 +95,11 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     }
 
     const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-    if (!(await isAllowed(env, ip))) {
+    if (!(await isAllowed(env, ip, route.scope))) {
       throw new AppError(
         'RATE_LIMITED',
         429,
-        'Za dużo analiz w krótkim czasie. Odczekaj minutę i spróbuj ponownie.',
+        'Za dużo zapytań w krótkim czasie. Odczekaj minutę i spróbuj ponownie.',
       );
     }
 
@@ -59,19 +110,8 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     } catch {
       throw new AppError('BAD_REQUEST', 400, 'Nieprawidłowy format żądania.');
     }
-    const parsed = analyzeRequestSchema.safeParse(body);
-    if (!parsed.success) {
-      throw new AppError(
-        'BAD_REQUEST',
-        400,
-        'Nieprawidłowe dane żądania.',
-        formatIssues(parsed.error),
-      );
-    }
-
-    const llm = createLlm(env);
-    const insight = await analyzeDocument(parsed.data, llm);
-    return json(insight, 200, cors);
+    const result = await route.run(body, () => createLlm(env));
+    return json(result, 200, cors);
   } catch (e) {
     if (e instanceof AppError) {
       const extra: Record<string, string> = { ...cors };
