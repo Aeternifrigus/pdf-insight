@@ -33,7 +33,7 @@ export function createLlm(env: Env, fetchFn: FetchFn = fetch): LlmClient {
   const provider = (env.LLM_PROVIDER ?? 'gemini').toLowerCase();
   if (provider === 'gemini') {
     if (!env.GEMINI_API_KEY) throw misconfigured('GEMINI_API_KEY');
-    return new GeminiClient(env.GEMINI_API_KEY, env.GEMINI_MODEL || 'gemini-2.5-flash', fetchFn);
+    return new GeminiClient(env.GEMINI_API_KEY, env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL, fetchFn);
   }
   if (provider === 'openai') {
     if (!env.OPENAI_API_KEY) throw misconfigured('OPENAI_API_KEY');
@@ -98,6 +98,23 @@ const BLOCK_REASONS = new Set([
   'LANGUAGE',
 ]);
 
+/**
+ * Domyślny model. `gemini-2.5-flash` jest od 2026 r. dostępny tylko dla projektów, które już go
+ * używały, więc nowy klucz API dostawał błąd. Aktualne modele Flash mają darmowy plan i obsługują
+ * obrazy (odczyt skanów). Model można zmienić zmienną GEMINI_MODEL bez zmiany kodu.
+ */
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
+
+/**
+ * Ustawienie „myślenia” modelu, krótsze odpowiedzi = mieszczenie się w 30 s z briefu.
+ * Gemini 2.5: thinkingBudget (0 wyłącza). Gemini 3: thinkingLevel (najniższy to "low").
+ */
+export function thinkingConfigFor(model: string): Record<string, unknown> | null {
+  if (/^gemini-2\.5-flash/.test(model)) return { thinkingBudget: 0 };
+  if (/^gemini-3/.test(model)) return { thinkingLevel: 'low' };
+  return null;
+}
+
 class GeminiClient implements LlmClient {
   constructor(
     private readonly apiKey: string,
@@ -109,11 +126,11 @@ class GeminiClient implements LlmClient {
     const generationConfig: Record<string, unknown> = {
       responseMimeType: 'application/json',
       temperature: 0.1,
-      maxOutputTokens: options.maxOutputTokens ?? 8192,
+      // Limit obejmuje też tokeny „myślenia” modelu, więc ma zapas ponad samą odpowiedź JSON.
+      maxOutputTokens: options.maxOutputTokens ?? 12_288,
     };
-    // Gemini 2.5 Flash: wyłączenie "thinking" skraca czas odpowiedzi do kilku sekund.
-    if (/^gemini-2\.5-flash/.test(this.model))
-      generationConfig.thinkingConfig = { thinkingBudget: 0 };
+    const thinkingConfig = thinkingConfigFor(this.model);
+    if (thinkingConfig) generationConfig.thinkingConfig = thinkingConfig;
 
     const body = {
       systemInstruction: { parts: [{ text: system }] },
@@ -201,7 +218,7 @@ class OpenAiCompatibleClient implements LlmClient {
         model: this.model,
         messages,
         temperature: 0.1,
-        max_tokens: options.maxOutputTokens ?? 8192,
+        max_tokens: options.maxOutputTokens ?? 12_288,
         response_format: { type: 'json_object' },
       },
       options.timeoutMs,

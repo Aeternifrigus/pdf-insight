@@ -11,7 +11,14 @@ import {
 import type { Env } from './env';
 import { AppError, ProviderError } from './errors';
 import { handle } from './router';
-import { createLlm, parseRetryAfter, type LlmClient, type Turn } from './llm';
+import {
+  createLlm,
+  DEFAULT_GEMINI_MODEL,
+  parseRetryAfter,
+  thinkingConfigFor,
+  type LlmClient,
+  type Turn,
+} from './llm';
 import {
   IMPORTANCE_RULES,
   neutralizeTags,
@@ -252,6 +259,36 @@ describe('błędy dostawcy AI', () => {
     await expect(
       analyzeDocument(request, new FakeLlm([good]), undefined, 1000),
     ).rejects.toMatchObject({ code: 'AI_TIMEOUT' });
+  });
+});
+
+describe('konfiguracja modelu Gemini', () => {
+  it('domyślnie używa aktualnego modelu z niskim poziomem „myślenia”', async () => {
+    let url = '';
+    let body = '';
+    const fetchFn = ((u: string, init: RequestInit) => {
+      url = u;
+      body = typeof init.body === 'string' ? init.body : '';
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            candidates: [{ finishReason: 'STOP', content: { parts: [{ text: good }] } }],
+          }),
+          { status: 200 },
+        ),
+      );
+    }) as typeof fetch;
+    await analyzeDocument(request, createLlm({ GEMINI_API_KEY: 'k' }, fetchFn));
+    expect(url).toContain(`/models/${DEFAULT_GEMINI_MODEL}:generateContent`);
+    expect(JSON.parse(body)).toMatchObject({
+      generationConfig: { thinkingConfig: { thinkingLevel: 'low' } },
+    });
+  });
+
+  it('dobiera ustawienie „myślenia” do generacji modelu', () => {
+    expect(thinkingConfigFor('gemini-2.5-flash')).toEqual({ thinkingBudget: 0 });
+    expect(thinkingConfigFor('gemini-3.5-flash-lite')).toEqual({ thinkingLevel: 'low' });
+    expect(thinkingConfigFor('llama-4')).toBeNull();
   });
 });
 

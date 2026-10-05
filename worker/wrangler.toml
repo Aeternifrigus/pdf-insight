@@ -5,7 +5,9 @@ compatibility_date = "2026-09-01"
 # Sekrety (NIE w repozytorium): wrangler secret put GEMINI_API_KEY --config worker/wrangler.toml
 [vars]
 LLM_PROVIDER = "gemini"
-GEMINI_MODEL = "gemini-2.5-flash"
+# Aktualny model Flash z darmowym planem i obsługą obrazów (gemini-2.5-flash nie jest już
+# dostępny dla nowych projektów). Przy niskich limitach darmowych: "gemini-3.5-flash-lite".
+GEMINI_MODEL = "gemini-3.8-flash"
 # Origin GitHub Pages to sama domena, bez ścieżki repozytorium.
 # Localhost NIE jest dopuszczony w produkcji; lokalnie nadpisuje to worker/.dev.vars.
 ALLOWED_ORIGINS = "https://aeternifrigus.github.io"
