@@ -350,24 +350,24 @@ export function groundLists(
   amounts: Insight['amounts'],
   dates: Insight['dates'],
 ): { amounts: Insight['amounts']; dates: Insight['dates']; warnings: string[] } {
-  if (req.images.length > 0) {
-    return {
-      amounts: amounts.map((a) => ({ ...a, foundInText: null })),
-      dates: dates.map((d) => ({ ...d, foundInText: null })),
-      warnings: [],
-    };
-  }
+  // Ze skanami wartość nieznaleziona w tekście mogła pochodzić z obrazu: null = nie da się sprawdzić.
+  const notFound = req.images.length > 0 ? null : false;
   const text = req.pages.map((p) => p.text).join('\n');
   const numbers = numbersInText(text);
   const folded = foldForSearch(text);
   const checkedAmounts = amounts.map((a) => ({
     ...a,
-    foundInText: amountInText(a.value, numbers),
+    foundInText: amountInText(a.value, numbers) || notFound,
   }));
-  const checkedDates = dates.map((d) => ({ ...d, foundInText: dateInText(d.date, folded) }));
+  const checkedDates = dates.map((d) => ({
+    ...d,
+    foundInText: dateInText(d.date, folded) || notFound,
+  }));
   const missing = [
-    ...checkedAmounts.filter((a) => !a.foundInText).map((a) => `${String(a.value)} ${a.currency}`),
-    ...checkedDates.filter((d) => !d.foundInText).map((d) => d.date),
+    ...checkedAmounts
+      .filter((a) => a.foundInText === false)
+      .map((a) => `${String(a.value)} ${a.currency}`),
+    ...checkedDates.filter((d) => d.foundInText === false).map((d) => d.date),
   ];
   const warnings =
     missing.length > 0

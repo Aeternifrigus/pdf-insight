@@ -306,13 +306,19 @@ describe('groundLists (kwoty i daty obecne w tekście)', () => {
     expect(result.analysis.warnings.join(' ')).toContain('999999 PLN');
   });
 
-  it('nie ocenia wartości, gdy część treści pochodzi ze skanów', () => {
+  it('przy skanach potwierdza wartości z tekstu, a resztę oznacza jako niesprawdzalne', () => {
     const r = groundLists(
-      { pages: [{ page: 1, text: '' }], images: [{ page: 1, mimeType: 'image/jpeg', data: 'A' }] },
-      [{ value: 5, currency: 'PLN', context: 'x' }],
+      {
+        pages: [{ page: 1, text: 'Kwota 120,00 zł.' }],
+        images: [{ page: 2, mimeType: 'image/jpeg', data: 'A' }],
+      },
+      [
+        { value: 120, currency: 'PLN', context: 'z tekstu' },
+        { value: 5, currency: 'PLN', context: 'może ze skanu' },
+      ],
       [],
     );
-    expect(r.amounts[0]?.foundInText).toBeNull();
+    expect(r.amounts.map((a) => a.foundInText)).toEqual([true, null]);
     expect(r.warnings).toEqual([]);
   });
 });
