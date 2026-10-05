@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { sampleModelOutput } from '../../src/lib/fixtures';
 import { insightSchema, type AnalyzeRequest } from '../../src/lib/schema';
-import { analyzeDocument, combineWarnings, extractJson, normalizeModelJson } from './analyze';
+import {
+  analyzeDocument,
+  combineWarnings,
+  extractJson,
+  normalizeModelJson,
+  parseUnambiguousNumber,
+} from './analyze';
 import type { Env } from './env';
 import { AppError } from './errors';
 import { handle } from './router';
@@ -133,6 +139,29 @@ describe('extractJson / normalizeModelJson', () => {
       ),
     ) as { amounts: { value: number; currency: string }[] };
     expect(parsed.amounts[0]).toMatchObject({ value: 184500.5, currency: 'PLN' });
+  });
+
+  it('normalizuje tylko format: tag języka, datę z czasem, angielski typ', () => {
+    const out = normalizeModelJson({
+      document: { language: 'pl-PL', type: 'Invoice', date: '2026-03-12T00:00:00Z' },
+      dates: [{ date: '2026-10-12T10:00:00+02:00', context: 'x' }],
+    }) as { document: { language: string; type: string; date: string }; dates: { date: string }[] };
+    expect(out.document).toMatchObject({ language: 'pl', type: 'faktura', date: '2026-03-12' });
+    expect(out.dates[0]?.date).toBe('2026-10-12');
+  });
+
+  it('nie przerabia pełnej nazwy języka na fałszywy kod', () => {
+    const out = normalizeModelJson({ document: { language: 'Polish', type: 'umowa' } }) as {
+      document: { language: string };
+    };
+    expect(out.document.language).toBe('Polish');
+  });
+
+  it('nie zgaduje niejednoznacznych liczb', () => {
+    expect(parseUnambiguousNumber('184 500,00')).toBe(184500);
+    expect(parseUnambiguousNumber('1,5')).toBe(1.5);
+    expect(parseUnambiguousNumber('12,345')).toBeNull();
+    expect(parseUnambiguousNumber('1.234,56')).toBeNull();
   });
 
   it('neutralizuje znaczniki udające blok dokumentu', () => {

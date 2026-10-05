@@ -50,6 +50,42 @@ const CURRENCY_ALIASES: Record<string, string> = {
   '£': 'GBP',
 };
 
+const TYPE_ALIASES: Record<string, string> = {
+  invoice: 'faktura',
+  contract: 'umowa',
+  agreement: 'umowa',
+  offer: 'oferta',
+  quote: 'oferta',
+  quotation: 'oferta',
+  report: 'raport',
+  other: 'inne',
+};
+
+/** Tag BCP 47 ("pl-PL", "en_US") → kod ISO 639-1. Inne wartości zostają bez zmian (walidacja je odrzuci). */
+export function normalizeLanguage(value: string): string {
+  const v = value.trim();
+  const m = /^([a-z]{2})(?:[-_][a-z0-9]+)*$/i.exec(v);
+  return m?.[1] ? m[1].toLowerCase() : v;
+}
+
+/** "2026-03-12T00:00:00Z" → "2026-03-12". Inne formaty zostają bez zmian. */
+export function normalizeDate(value: string): string {
+  const v = value.trim();
+  return /^\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:?\d{2})?$/.test(v) ? v.slice(0, 10) : v;
+}
+
+/**
+ * Liczba zapisana jako tekst, tylko gdy zapis jest jednoznaczny:
+ * "184 500,00", "184500.5", "1,5". Zapis "12,345" może oznaczać 12 345 albo 12,345,
+ * więc zostaje bez zmian i trafia do ponownej próby zamiast cichej pomyłki o 1000×.
+ */
+export function parseUnambiguousNumber(value: string): number | null {
+  const v = value.replace(/[\s\u00a0]/g, '');
+  if (/^-?\d+(\.\d+)?$/.test(v)) return Number(v);
+  if (/^-?\d+,\d{1,2}$/.test(v)) return Number(v.replace(',', '.'));
+  return null;
+}
+
 /**
  * Drobna normalizacja formatu (nie treści): wielkość liter kodów,
  * symbole walut, liczby zapisane jako tekst, puste napisy → null.
@@ -60,13 +96,16 @@ export function normalizeModelJson(input: unknown): unknown {
 
   const doc = o.document as Record<string, unknown> | undefined;
   if (doc && typeof doc === 'object') {
-    if (typeof doc.language === 'string')
-      doc.language = doc.language.trim().toLowerCase().slice(0, 2);
-    if (typeof doc.type === 'string') doc.type = doc.type.trim().toLowerCase();
+    if (typeof doc.language === 'string') doc.language = normalizeLanguage(doc.language);
+    if (typeof doc.type === 'string') {
+      const t = doc.type.trim().toLowerCase();
+      doc.type = TYPE_ALIASES[t] ?? t;
+    }
     for (const k of ['title', 'date'] as const) {
       if (typeof doc[k] === 'string' && doc[k].trim() === '') doc[k] = null;
       if (doc[k] === undefined) doc[k] = null;
     }
+    if (typeof doc.date === 'string') doc.date = normalizeDate(doc.date);
   }
 
   if (Array.isArray(o.amounts)) {
@@ -78,10 +117,19 @@ export function normalizeModelJson(input: unknown): unknown {
         amt.currency = CURRENCY_ALIASES[c] ?? c;
       }
       if (typeof amt.value === 'string') {
-        const n = Number(amt.value.replace(/\s/g, '').replace(',', '.'));
-        if (Number.isFinite(n)) amt.value = n;
+        const n = parseUnambiguousNumber(amt.value);
+        if (n !== null) amt.value = n;
       }
       return amt;
+    });
+  }
+
+  if (Array.isArray(o.dates)) {
+    o.dates = o.dates.map((d: unknown) => {
+      if (!d || typeof d !== 'object') return d;
+      const entry = { ...(d as Record<string, unknown>) };
+      if (typeof entry.date === 'string') entry.date = normalizeDate(entry.date);
+      return entry;
     });
   }
 
