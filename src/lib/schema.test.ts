@@ -109,6 +109,23 @@ describe('analyzeRequestSchema', () => {
     expect(analyzeRequestSchema.safeParse(tooMany).success).toBe(false);
   });
 
+  it('odrzuca powtórzone strony, strony poza zakresem i obrazy dla nieistniejących stron', () => {
+    const dup = {
+      ...base,
+      pages: [
+        { page: 1, text: 'a' },
+        { page: 1, text: 'b' },
+      ],
+    };
+    expect(analyzeRequestSchema.safeParse(dup).success).toBe(false);
+
+    const outOfRange = { ...base, pages: [{ page: 5, text: 'a' }] };
+    expect(analyzeRequestSchema.safeParse(outOfRange).success).toBe(false);
+
+    const orphan = { ...base, images: [{ page: 9, mimeType: 'image/jpeg', data: 'AAAA' }] };
+    expect(analyzeRequestSchema.safeParse(orphan).success).toBe(false);
+  });
+
   it('odrzuca obrazy w innym formacie niż JPEG', () => {
     const png = { ...base, images: [{ page: 1, mimeType: 'image/png', data: 'AAAA' }] };
     expect(analyzeRequestSchema.safeParse(png).success).toBe(false);

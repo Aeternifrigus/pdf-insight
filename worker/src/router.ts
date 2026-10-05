@@ -6,8 +6,8 @@ import { corsHeaders, errorResponse, json, parseAllowedOrigins, readBodyLimited 
 import { createLlm } from './llm';
 import { isAllowed } from './rateLimit';
 
-/** Tekst (maks. 400 tys. znaków) + do 4 obrazów skanów zakodowanych w base64. */
-export const MAX_BODY_BYTES = 8 * 1024 * 1024;
+/** Tekst (maks. 400 tys. znaków, do ok. 1 MB w UTF-8) + do 4 obrazów po maks. 600 tys. znaków base64. */
+export const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
 export async function handle(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);

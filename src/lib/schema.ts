@@ -145,32 +145,58 @@ export const reduceOutputSchema = z.object({
 export type ReduceOutput = z.infer<typeof reduceOutputSchema>;
 
 /** Żądanie wysyłane z frontendu do backendu. */
+/**
+ * Limity dobrane pod budżet CPU Cloudflare Workers (plan darmowy: 10 ms na żądanie).
+ * Parsowanie i walidacja najgorszego przypadku mieszczą się w kilku ms.
+ * Treść obrazów nie jest sprawdzana regexem (koszt O(n)); robi to dostawca AI.
+ */
 export const MAX_TEXT_CHARS = 400_000;
 export const MAX_IMAGES = 4;
-export const MAX_IMAGE_BASE64_CHARS = 1_500_000;
+export const MAX_IMAGE_BASE64_CHARS = 600_000;
 
-export const analyzeRequestSchema = z.object({
-  fileName: nonEmpty.max(255),
-  pageCount: z.number().int().min(1).max(2000),
-  pages: z
-    .array(z.object({ page: z.number().int().min(1), text: z.string() }))
-    .min(1)
-    .refine((p) => p.reduce((n, x) => n + x.text.length, 0) <= MAX_TEXT_CHARS, {
-      message: 'Tekst dokumentu jest zbyt długi',
-    }),
-  images: z
-    .array(
-      z.object({
-        page: z.number().int().min(1),
-        mimeType: z.literal('image/jpeg'),
-        data: z
-          .string()
-          .max(MAX_IMAGE_BASE64_CHARS)
-          .regex(/^[A-Za-z0-9+/=]+$/),
+export const analyzeRequestSchema = z
+  .object({
+    fileName: nonEmpty.max(255),
+    pageCount: z.number().int().min(1).max(2000),
+    pages: z
+      .array(z.object({ page: z.number().int().min(1), text: z.string() }))
+      .min(1)
+      .refine((p) => p.reduce((n, x) => n + x.text.length, 0) <= MAX_TEXT_CHARS, {
+        message: 'Tekst dokumentu jest zbyt długi',
       }),
-    )
-    .max(MAX_IMAGES),
-});
+    images: z
+      .array(
+        z.object({
+          page: z.number().int().min(1),
+          mimeType: z.literal('image/jpeg'),
+          data: z.string().min(1).max(MAX_IMAGE_BASE64_CHARS),
+        }),
+      )
+      .max(MAX_IMAGES),
+  })
+  .superRefine((req, ctx) => {
+    const pageNumbers = new Set<number>();
+    for (const { page } of req.pages) {
+      if (page > req.pageCount) {
+        ctx.addIssue({ code: 'custom', path: ['pages'], message: `Strona ${page} poza zakresem` });
+      }
+      if (pageNumbers.has(page)) {
+        ctx.addIssue({ code: 'custom', path: ['pages'], message: `Powtórzona strona ${page}` });
+      }
+      pageNumbers.add(page);
+    }
+    const imagePages = new Set<number>();
+    for (const { page } of req.images) {
+      if (!pageNumbers.has(page) || imagePages.has(page)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['images'],
+          message: `Obraz dla strony ${page} nie pasuje do listy stron`,
+        });
+      }
+      imagePages.add(page);
+    }
+  });
 export type AnalyzeRequest = z.infer<typeof analyzeRequestSchema>;
 
 /** Czytelna lista błędów walidacji (do komunikatów i do ponownej próby modelu). */
