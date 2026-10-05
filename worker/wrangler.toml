@@ -1,0 +1,19 @@
+name = "pdf-insight-api"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+# Sekrety (NIE w repozytorium): wrangler secret put GEMINI_API_KEY --config worker/wrangler.toml
+[vars]
+LLM_PROVIDER = "gemini"
+GEMINI_MODEL = "gemini-2.5-flash"
+# Origin GitHub Pages to sama domena, bez ścieżki repozytorium.
+ALLOWED_ORIGINS = "https://aeternifrigus.github.io,http://localhost:5173,http://localhost:4173"
+
+# Limit żądań współdzielony między instancjami workera (10 analiz / 60 s na adres IP).
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }
+
+[observability]
+enabled = true
