@@ -13,10 +13,16 @@ export interface Turn {
   images?: LlmImage[];
 }
 
+export interface CallOptions {
+  /** Pozwala skrócić wywołanie do pozostałego budżetu czasu analizy. */
+  timeoutMs?: number;
+  /** Tłumaczenie całego dokumentu potrzebuje dłuższej odpowiedzi niż analiza. */
+  maxOutputTokens?: number;
+}
+
 export interface LlmClient {
   readonly model: string;
-  /** `timeoutMs` pozwala skrócić wywołanie do pozostałego budżetu czasu analizy. */
-  complete(system: string, turns: Turn[], timeoutMs?: number): Promise<string>;
+  complete(system: string, turns: Turn[], options?: CallOptions): Promise<string>;
 }
 
 type FetchFn = typeof fetch;
@@ -99,11 +105,11 @@ class GeminiClient implements LlmClient {
     private readonly fetchFn: FetchFn,
   ) {}
 
-  async complete(system: string, turns: Turn[], timeoutMs?: number): Promise<string> {
+  async complete(system: string, turns: Turn[], options: CallOptions = {}): Promise<string> {
     const generationConfig: Record<string, unknown> = {
       responseMimeType: 'application/json',
       temperature: 0.1,
-      maxOutputTokens: 8192,
+      maxOutputTokens: options.maxOutputTokens ?? 8192,
     };
     // Gemini 2.5 Flash: wyłączenie "thinking" skraca czas odpowiedzi do kilku sekund.
     if (/^gemini-2\.5-flash/.test(this.model))
@@ -129,7 +135,7 @@ class GeminiClient implements LlmClient {
       url,
       { 'x-goog-api-key': this.apiKey },
       body,
-      timeoutMs,
+      options.timeoutMs,
     )) as {
       candidates?: {
         content?: { parts?: { text?: string; thought?: boolean }[] };
@@ -168,7 +174,7 @@ class OpenAiCompatibleClient implements LlmClient {
     private readonly fetchFn: FetchFn,
   ) {}
 
-  async complete(system: string, turns: Turn[], timeoutMs?: number): Promise<string> {
+  async complete(system: string, turns: Turn[], options: CallOptions = {}): Promise<string> {
     const messages = [
       { role: 'system', content: system },
       ...turns.map((t) => {
@@ -195,10 +201,10 @@ class OpenAiCompatibleClient implements LlmClient {
         model: this.model,
         messages,
         temperature: 0.1,
-        max_tokens: 8192,
+        max_tokens: options.maxOutputTokens ?? 8192,
         response_format: { type: 'json_object' },
       },
-      timeoutMs,
+      options.timeoutMs,
     )) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
 
     const choice = data.choices?.[0];

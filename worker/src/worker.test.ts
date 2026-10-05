@@ -230,8 +230,8 @@ describe('błędy dostawcy AI', () => {
     const timeouts: (number | undefined)[] = [];
     const llm: LlmClient = {
       model: 'x',
-      complete: (_s, _t, timeoutMs) => {
-        timeouts.push(timeoutMs);
+      complete: (_s, _t, options) => {
+        timeouts.push(options?.timeoutMs);
         return Promise.resolve(good);
       },
     };

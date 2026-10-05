@@ -174,16 +174,29 @@ export const ANALYSIS_BUDGET_MS = 100_000;
 /** Minimalny czas potrzebny na sensowne wywołanie modelu. */
 const MIN_CALL_MS = 8_000;
 
-export async function callValidated<S extends z.ZodType>(
+export interface ModelCallOptions<T> {
+  deadline?: number;
+  maxOutputTokens?: number;
+  /**
+   * Dodatkowa kontrola treści po walidacji schematu (np. czy tłumaczenie zachowało liczby).
+   * Problemy trafiają do jednej ponownej próby; jeśli zostaną, wynik jest zwracany razem z nimi,
+   * żeby wywołujący mógł je jawnie pokazać zamiast odrzucać całą odpowiedź.
+   */
+  check?: (data: T) => string[];
+}
+
+export async function callModel<S extends z.ZodType>(
   llm: LlmClient,
   system: string,
   userTurn: Turn,
   schema: S,
-  deadline = Date.now() + ANALYSIS_BUDGET_MS,
-): Promise<z.infer<S>> {
+  options: ModelCallOptions<z.infer<S>> = {},
+): Promise<{ data: z.infer<S>; issues: string[] }> {
+  const deadline = options.deadline ?? Date.now() + ANALYSIS_BUDGET_MS;
   const turns: Turn[] = [userTurn];
   let lastIssues: string[] = [];
   let rateLimitRetried = false;
+  let checked: { data: z.infer<S>; issues: string[] } | null = null;
 
   for (let attempt = 0; attempt < 2; attempt++) {
     // Bez tego przy długich dokumentach backend pracowałby (i zużywał limit API)
@@ -194,7 +207,10 @@ export async function callValidated<S extends z.ZodType>(
     let raw: string;
     try {
       // Pojedyncze wywołanie nie może wyjść poza budżet całej analizy.
-      raw = await llm.complete(system, turns, Math.min(CALL_TIMEOUT_MS, deadline - Date.now()));
+      raw = await llm.complete(system, turns, {
+        timeoutMs: Math.min(CALL_TIMEOUT_MS, deadline - Date.now()),
+        maxOutputTokens: options.maxOutputTokens,
+      });
     } catch (e) {
       if (e instanceof TruncatedResponseError) {
         // Ucięty JSON: zamiast ogólnego "popraw błędy" prosimy wprost o krótszą odpowiedź.
@@ -257,7 +273,18 @@ export async function callValidated<S extends z.ZodType>(
     }
 
     const result = schema.safeParse(parsed);
-    if (result.success) return result.data;
+    if (result.success) {
+      const data = result.data;
+      const issues = options.check?.(data) ?? [];
+      if (issues.length === 0) return { data, issues };
+      checked = { data, issues };
+      lastIssues = issues;
+      turns.push(
+        { role: 'model', text: raw.slice(0, 40_000) },
+        { role: 'user', text: retryPrompt(issues) },
+      );
+      continue;
+    }
 
     lastIssues = formatIssues(result.error);
     turns.push(
@@ -266,12 +293,24 @@ export async function callValidated<S extends z.ZodType>(
     );
   }
 
+  // Poprawny schemat, ale kontrola treści nadal zgłasza problemy: zwracamy z problemami.
+  if (checked) return checked;
   throw new AppError(
     'INVALID_AI_RESPONSE',
     502,
     'Model AI zwrócił niepoprawne dane także przy ponownej próbie.',
     lastIssues.slice(0, 10),
   );
+}
+
+export async function callValidated<S extends z.ZodType>(
+  llm: LlmClient,
+  system: string,
+  userTurn: Turn,
+  schema: S,
+  deadline = Date.now() + ANALYSIS_BUDGET_MS,
+): Promise<z.infer<S>> {
+  return (await callModel(llm, system, userTurn, schema, { deadline })).data;
 }
 
 async function mapLimited<T, R>(
