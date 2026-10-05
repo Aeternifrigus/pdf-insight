@@ -258,9 +258,7 @@ function chunkTurn(
     : '';
   return {
     role: 'user',
-    text:
-      documentBlock(nonce, { fileName: req.fileName, pageCount: req.pageCount }, chunk, part) +
-      note,
+    text: documentBlock(nonce, { pageCount: req.pageCount }, chunk, part) + note,
     images: imgs,
   };
 }
@@ -297,7 +295,7 @@ export async function analyzeDocument(
 
   const nonce = newNonce();
   const system = systemPrompt(nonce);
-  const meta = { fileName: req.fileName, pageCount: req.pageCount };
+  const meta = { pageCount: req.pageCount };
 
   let core: Pick<ModelOutput, 'document' | 'summary' | 'keyPoints'>;
   let lists: ReturnType<typeof mergeLists>;
