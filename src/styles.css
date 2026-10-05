@@ -127,8 +127,15 @@ h3 {
 .view-switch {
   display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0;
+}
+
+.view-switch-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
 }
 
 .lang-switch button,
@@ -171,7 +178,6 @@ h3 {
 }
 
 .view-switch-label {
-  margin-right: 0.75rem;
   color: var(--ink-soft);
   font-size: var(--step--1);
 }

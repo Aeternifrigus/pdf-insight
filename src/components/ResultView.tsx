@@ -144,29 +144,31 @@ export function ResultView({
         </dl>
       </header>
 
-      <div className="view-switch" role="group" aria-label={t.view.label}>
-        <span className="view-switch-label" aria-hidden="true">
+      <div className="view-switch-row">
+        <span className="view-switch-label" id="view-switch-label">
           {t.view.label}
         </span>
-        <button
-          type="button"
-          aria-pressed={view === 'original'}
-          onClick={() => {
-            controller.current?.abort();
-            setTranslateState({ kind: 'idle' });
-            setView('original');
-          }}
-        >
-          {t.view.original(languageName(insight.document.language, lang))}
-        </button>
-        <button
-          type="button"
-          lang={target}
-          aria-pressed={view === 'translated'}
-          onClick={() => void showTranslated()}
-        >
-          {t.languageNames[target]}
-        </button>
+        <div className="view-switch" role="group" aria-labelledby="view-switch-label">
+          <button
+            type="button"
+            aria-pressed={view === 'original'}
+            onClick={() => {
+              controller.current?.abort();
+              setTranslateState({ kind: 'idle' });
+              setView('original');
+            }}
+          >
+            {t.view.original(languageName(insight.document.language, lang))}
+          </button>
+          <button
+            type="button"
+            lang={target}
+            aria-pressed={view === 'translated'}
+            onClick={() => void showTranslated()}
+          >
+            {t.languageNames[target]}
+          </button>
+        </div>
       </div>
 
       {view === 'translated' && translateState.kind === 'loading' && (

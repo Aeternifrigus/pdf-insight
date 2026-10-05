@@ -11,7 +11,7 @@ interface Props {
 }
 
 export function HistoryPanel({ entries, activeId, onOpen, onRemove, onClear }: Props) {
-  const { t, locale } = useI18n();
+  const { t, locale, lang } = useI18n();
   if (entries.length === 0) return null;
   return (
     <section className="history" aria-labelledby="history-title">
@@ -34,7 +34,10 @@ export function HistoryPanel({ entries, activeId, onOpen, onRemove, onClear }: P
               aria-current={e.id === activeId ? 'true' : undefined}
             >
               <span className="history-name">
-                {e.insight.document.title ?? e.insight.document.fileName}
+                {/* Tytuł w języku interfejsu, jeśli wynik ma takie tłumaczenie. */}
+                {e.translations?.[lang]?.document.title ??
+                  e.insight.document.title ??
+                  e.insight.document.fileName}
               </span>
               <span className="history-meta">
                 {t.types[e.insight.document.type]}, {formatDateTime(e.savedAt, locale)}
