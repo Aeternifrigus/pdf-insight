@@ -92,7 +92,25 @@ Błędy znalezione podczas budowy tej części:
 30. **Szumny raport tłumaczenia.** Pełny test (frontend, Worker, atrapa modelu zwracająca polski zapis w tekście angielskim) pokazał, że „2 500 000,00” było raportowane jako zły zapis i dodatkowo jako „dodane 0” (część „,00” czytana osobno). Liczba w złym zapisie, ale z dobrą wartością, jest teraz raportowana tylko raz, jako problem zapisu.
 31. **Przełącznik języka wyniku na 360 px** rozpadał się na dwie linie; etykieta jest teraz nad przyciskami, które zawsze zostają razem.
 
+## Czwarty przegląd: zakazy z briefu, wiarygodność danych, autorstwo
+
+Prompt (pisownia oryginalna): _„check for their must not dos and check legitimacy of data imp factor checker and by aeternifrigus”_
+
+**Zakazy i dyskwalifikacje.** Każdy punkt z briefu sprawdzony w kodzie, w całej historii Git i w zbudowanej aplikacji (tabela „Zgodność z zakazami” w README). Kluczy API, plików `.env`, `any`, `console.log` i `dangerouslySetInnerHTML` nie ma nigdzie; wszystkie commity są w formacie Conventional Commits. Znalezione i poprawione:
+
+32. Jedno wyłączenie reguły ESLint (`no-control-regex`); zastąpione wyrażeniem opartym na kategorii Unicode.
+33. Angielskie teksty w polskim interfejsie: przycisk „English” w przełączniku języka wyniku oraz domyślne, angielskie komunikaty walidacji Zod w „Szczegółach technicznych”.
+34. Nieaktualne lub zbyt mocne twierdzenia w dokumentacji: localhost w produkcyjnym CORS, zdanie „aplikacja ignoruje ukryte polecenie” (nie sprawdzone na prawdziwym modelu) i zrzuty ekranu z atrapy modelu podpisane jak wynik analizy.
+
+**Wiarygodność danych.**
+
+35. **Kontrola wartości potwierdzała skutek ataku.** Gdyby model wykonał ukryte polecenie i podał kwotę „1 PLN”, kontrola uznałaby ją za „znalezioną w tekście”, bo tekst polecenia też jest tekstem dokumentu. Do tego nie wykrywała przeliczonej waluty (8 600 EUR jako PLN) i w ogóle nie sprawdzała kwot i dat w podsumowaniu. Ostrzeżenie twierdziło też, że polecenie „nie zostało wykonane”, czego kod nie sprawdzał. Teraz wiersze z poleceniem są wyłączone z dowodów, wartości z samego polecenia i z niezgodną walutą są oznaczane (`issue`), a podsumowanie i punkty przechodzą tę samą kontrolę.
+36. **Fałszywy alarm na prawdziwym dokumencie.** Test na umowie testowej pokazał, że „295 200,00 zł” jest w PDF przełamane na dwa wiersze, więc kontrola zgłosiłaby prawdziwą kwotę. Teraz potwierdza 56 z 57 kwot z dokumentu bez fałszywego alarmu (jedyna niepotwierdzona jest tylko na skanie).
+37. **Sprawdzarka faktów** (`eval/`): wzorzec wszystkich kwot, dat, podmiotów i osób z umowy testowej, odczytany ręcznie z 12 stron, oraz porównanie z nim pobranego wyniku. Wynik atrapy modelu ze zrzutów ekranu przechodzi 25 z 28 sprawdzeń obowiązkowych, bo brakuje trzech wymaganych dat; dlatego zrzuty są podpisane jako pochodzące z atrapy.
+
+**Autorstwo.** Wszystkie commity mają autora i zatwierdzającego `Aeternifrigus`, bez dopisków o współautorstwie. Udział Claude jest opisany w tym pliku, zgodnie z wymaganiem briefu.
+
 ## Weryfikacja
 
-- `npm run lint`, `npm run typecheck`, `npm test` (120 testów), `npm run test:e2e` (18 testów) i `npm run build` przechodzą bez błędów i ostrzeżeń.
+- `npm run lint`, `npm run typecheck`, `npm test` (140 testów), `npm run test:e2e` (19 testów) i `npm run build` przechodzą bez błędów i ostrzeżeń. `npm run check:facts` z plikiem testowym: 27 sprawdzeń odczytu i kontroli wartości na prawdziwym dokumencie.
 - Test end-to-end w headless Chromium na pliku testowym i na nietypowych PDF-ach (tabela w README): odczyt 12 stron, strona 11 wyrenderowana do JPEG i wysłana do modelu, ostrzeżenie o instrukcji ze strony 4, brak poziomego przewijania przy 360 px, pobranie pliku `.json`, historia po przeładowaniu, komunikat błędu dla pliku, który nie jest PDF-em.

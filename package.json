@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "description": "PDF Insight: podsumowanie i ekstrakcja danych strukturalnych z plików PDF",
+  "author": "Aeternifrigus",
   "scripts": {
     "predev": "node scripts/copy-pdfjs-assets.mjs",
     "dev": "vite",

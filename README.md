@@ -4,9 +4,15 @@ Aplikacja webowa, która wczytuje plik PDF, tworzy jego krótkie podsumowanie i 
 
 **Demo:** https://aeternifrigus.github.io/pdf-insight/
 
+**Autor:** [Aeternifrigus](https://github.com/Aeternifrigus)
+
 ![Zrzut ekranu: wynik analizy umowy testowej](docs/screenshot.png)
 
 ![Zrzut ekranu: ten sam wynik w interfejsie angielskim, po przetłumaczeniu](docs/screenshot-en.png)
+
+_Zrzuty pochodzą z testu przeglądarkowego z atrapą modelu („mock-model”); wynik prawdziwego modelu widać w demo._
+
+<!-- Przed oddaniem: podmienić oba zrzuty na wynik z wdrożonego demo (Gemini) i usunąć zdanie powyżej. -->
 
 ## Co potrafi
 
@@ -61,7 +67,11 @@ worker/src/     backend: router HTTP, CORS, limity, prompty, klient LLM, analiza
 - **PDF nie opuszcza przeglądarki.** Tekst wyciąga pdf.js po stronie klienta, a do backendu trafia wyłącznie tekst stron i obrazy stron zeskanowanych. Dzięki temu żądania są małe, a limit 10 MB dotyczy pliku, nie transferu.
 - **Jeden schemat Zod dla frontendu i backendu** (`src/lib/schema.ts`). Backend waliduje odpowiedź modelu i przy błędzie robi dokładnie jedną ponowną próbę, przekazując modelowi listę błędów. Frontend waliduje wynik ponownie przed wyświetleniem i nie ufa ślepo backendowi.
 - **Pola wyliczane deterministycznie nie pochodzą od modelu.** `fileName` i `pages` ustawia kod, model nie może ich zmienić. Dodane pole `analysis` (model, data, liczba fragmentów, strony ze skanu, strony nieodczytane, ostrzeżenia) jest dozwolone przez brief („pola można dodawać”).
-- **Kwoty i daty są sprawdzane w tekście dokumentu** (bez AI, `src/lib/grounding.ts`). Każda pozycja dostaje dodatkowe pole `foundInText`: `true` (występuje w tekście, w dowolnym typowym zapisie: „184 500,00”, „1,234.56”, „4,2 mln”, „12.03.2026”, „12 marca 2026”), `false` (nie występuje: możliwe zmyślenie lub wartość wyliczona przez model, oznaczona w widoku i w ostrzeżeniach) albo `null` (nie da się sprawdzić, bo część treści pochodzi ze skanów). Nic nie jest usuwane; decyzja należy do użytkownika.
+- **Kwoty i daty są sprawdzane w tekście dokumentu** (bez AI, `src/lib/grounding.ts`), zarówno na listach `amounts`/`dates`, jak i w podsumowaniu i najważniejszych punktach. Każda pozycja dostaje dodatkowe pole `foundInText`: `true` (występuje w tekście, w dowolnym typowym zapisie: „184 500,00”, „1,234.56”, „4,2 mln”, „12.03.2026”, „12 marca 2026”, także przełamana między wierszami), `false` (z powodem w polu `issue`) albo `null` (nie da się sprawdzić, bo część treści pochodzi ze skanów). Powody:
+  - `fromInstruction`: wartość występuje w dokumencie **tylko w tekście wyglądającym na polecenie dla AI** (np. „1 PLN” z ukrytej instrukcji w umowie testowej). Tekst polecenia jest wyłączony z dowodów; wcześniej kontrola uznawała taką wartość za „znalezioną”, czyli potwierdzała skutek ataku;
+  - `currencyMismatch`: wartość występuje w dokumencie tylko z inną walutą (np. 8 600 EUR podane jako PLN);
+  - `notInText`: wartości nie ma w tekście (możliwe zmyślenie albo wartość wyliczona przez model).
+    Nic nie jest usuwane; pozycje są oznaczone w widoku, w eksporcie i w ostrzeżeniach, a decyzja należy do użytkownika. Na prawdziwej umowie testowej kontrola potwierdza 56 z 57 kwot zapisanych w dokumencie, bez żadnego fałszywego alarmu; jedyna niepotwierdzona (`null`, nie `false`) to 13 100 PLN, która jest wyłącznie na skanie aneksu.
 - **Pokrycie analizy jest jawne.** Gdy część stron nie mogła zostać odczytana (np. skany ponad limit), model dostaje o tym informację, wynik zawiera `analysis.unreadPages`, a widok pokazuje np. „Przeanalizowano: 4 z 150 stron”. Częściowa analiza nigdy nie wygląda na pełną.
 - **Pola formularzy.** Wartości wypełnionych pól AcroForm nie należą do warstwy tekstowej strony, więc są odczytywane osobno (`src/lib/forms.ts`) i dołączane do tekstu jako „[Pola formularza]”.
 - **Czyszczenie tekstu.** Ligatury (ﬁ → fi), twarde i wąskie spacje, miękkie łączniki, znaki zerowej szerokości, znaki sterujące kierunkiem tekstu i znaki kontrolne są normalizowane przed wysłaniem do modelu i przed heurystykami.
@@ -79,7 +89,7 @@ worker/src/     backend: router HTTP, CORS, limity, prompty, klient LLM, analiza
 ### Bezpieczeństwo
 
 - Klucz API istnieje tylko jako sekret Cloudflare (`GEMINI_API_KEY`). W repozytorium jest wyłącznie `.env.example` i `worker/.dev.vars.example`; `.env` i `.dev.vars` są w `.gitignore`.
-- CORS: backend odpowiada tylko originom z `ALLOWED_ORIGINS` (domena GitHub Pages i localhost). Żądania z przeglądarki z innej domeny dostają 403.
+- CORS: backend odpowiada tylko originom z `ALLOWED_ORIGINS`: w produkcji wyłącznie `https://aeternifrigus.github.io` (localhost tylko lokalnie, przez `worker/.dev.vars`). Żądania z przeglądarki z innej domeny dostają 403.
 - Limity: 10 MB na plik (frontend), 4 MB na żądanie, 400 tys. znaków tekstu, maks. 4 obrazy po 600 tys. znaków base64, 10 analiz na minutę na adres IP (binding Cloudflare Rate Limiting plus limit w pamięci jako druga warstwa). Rozmiar żądania jest dobrany tak, żeby parsowanie i walidacja najgorszego przypadku zajmowały kilka ms CPU (darmowy plan Workers ma 10 ms na żądanie).
 - Content-Security-Policy (jako `<meta>`, bo GitHub Pages nie ustawia nagłówków): skrypty i fonty tylko z własnej domeny, połączenia tylko do własnej domeny i API, bez `eval` (jedynie `wasm-unsafe-eval` dla dekoderów pdf.js). Fonty są serwowane lokalnie, bez zapytań do Google Fonts.
 - Analiza ma budżet 100 s po stronie backendu (klient czeka 120 s), więc Worker nie zużywa limitu API po tym, jak przeglądarka przestała czekać. Treść błędów dostawcy AI trafia tylko do logów Workera.
@@ -90,9 +100,49 @@ worker/src/     backend: router HTTP, CORS, limity, prompty, klient LLM, analiza
   - model ma jawnie zakazane wykonywanie poleceń z dokumentu i ma je zgłosić w ostrzeżeniach;
   - niezależnie od modelu działa heurystyka (PL/EN/DE, odporna na brak polskich znaków), która wykrywa typowe frazy i pokazuje użytkownikowi ostrzeżenie;
   - wynik jest ściśle walidowany schematem i renderowany wyłącznie jako tekst (bez `dangerouslySetInnerHTML`, reguła ESLint to wymusza).
-    Testowa umowa zawiera ukrytą instrukcję (strona 4, tekst 5 pt), która każe napisać, że umowa jest nieważna i warta 1 PLN. Aplikacja ją ignoruje i pokazuje ostrzeżenie.
+    Testowa umowa zawiera ukrytą instrukcję (strona 4, tekst 5 pt), która każe napisać, że umowa jest nieważna i warta 1 PLN. Model ma ją zignorować, użytkownik dostaje ostrzeżenie, a jeśli wynik mimo to zawiera wartość z polecenia (np. 1 PLN w kwotach lub w podsumowaniu), jest ona oznaczona jako możliwa manipulacja. Ostrzeżenie nie twierdzi, że polecenie „nie zostało wykonane”, bo kod nie może tego zagwarantować.
 - Użytkownik widzi informację, że treść pliku trafia do zewnętrznego API AI (przy polu wgrywania i w stopce).
 - Szczegóły błędów wewnętrznych nie trafiają do klienta.
+
+## Zgodność z zakazami i dyskwalifikacjami z briefu
+
+Każdy punkt sprawdzony w kodzie, w historii Git i w zbudowanej aplikacji (nie tylko zadeklarowany):
+
+| Wymóg z briefu                                 | Jak sprawdzone                                                                                                                                                          | Wynik                                                                 |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Klucz API nigdy we frontendzie                 | `grep` zbudowanego `dist/` pod kątem kluczy, adresów dostawców AI i nagłówków autoryzacji; frontend zna tylko `VITE_API_URL`                                            | brak                                                                  |
+| Klucz API nigdy w historii Git                 | przeszukanie `git log -p` wszystkich commitów pod kątem wzorców kluczy (Google, OpenAI, Groq, GitHub) i lista wszystkich plików, które kiedykolwiek były w repozytorium | brak; w historii są tylko `.env.example` i `worker/.dev.vars.example` |
+| `.env` nigdy w repozytorium                    | j.w. oraz `.gitignore` (`.env`, `.env.*`, `worker/.dev.vars`)                                                                                                           | brak                                                                  |
+| Brak `any`                                     | `@typescript-eslint/no-explicit-any` jako błąd + `grep`                                                                                                                 | 0 wystąpień                                                           |
+| Brak `console.log`                             | reguła `no-console` jako błąd; w backendzie dozwolone tylko `console.error` (logi Workera)                                                                              | 0 × `console.log`                                                     |
+| Brak wyłączeń reguł                            | `grep` pod kątem `eslint-disable`, `@ts-ignore`, `@ts-expect-error`                                                                                                     | 0 wystąpień                                                           |
+| Bez `dangerouslySetInnerHTML`                  | reguła ESLint `no-restricted-syntax` + `grep` (także `innerHTML`, `eval`)                                                                                               | 0 wystąpień                                                           |
+| Treść PDF to dane, nie instrukcje              | izolacja w prompcie, heurystyka, kontrola wartości z polecenia (`fromInstruction`), testy w `worker/src/legitimacy.test.ts`                                             | spełnione                                                             |
+| CORS ograniczony do domeny demo                | `ALLOWED_ORIGINS` w `wrangler.toml` = tylko domena GitHub Pages                                                                                                         | spełnione                                                             |
+| Limit żądań i rozmiaru pliku                   | 10 MB w przeglądarce, 4 MB na żądanie, 10 analiz/min/IP                                                                                                                 | spełnione                                                             |
+| Pola schematu można dodawać, nie usuwać        | wszystkie pola z sekcji 04 są wymagane w `insightSchema`; dodane: `analysis`, `foundInText`, `issue`                                                                    | spełnione                                                             |
+| Model nie zgaduje; 1 ponowna próba, potem błąd | prompt + `callModel` (testy: ponowienie i błąd po drugiej próbie)                                                                                                       | spełnione                                                             |
+| Komunikaty po polsku                           | domyślny język interfejsu to polski; komunikaty walidacji Zod też po polsku                                                                                             | spełnione (angielski tylko po przełączeniu)                           |
+| Kilka logicznych Conventional Commits          | każdy commit w historii pasuje do `typ(zakres): opis`                                                                                                                   | spełnione                                                             |
+| Działające demo po 24 h                        | wymaga wdrożenia (sekcja „Wdrożenie”)                                                                                                                                   | do zrobienia przez autora                                             |
+| Kod, który autor potrafi wyjaśnić              | opis decyzji w README i przebieg pracy w AI_LOG.md                                                                                                                      | po stronie autora                                                     |
+
+## Kontrola jakości wyników AI
+
+Jakość wyników to 20% oceny, a model można sprawdzić tylko na prawdziwym dokumencie. Katalog `eval/` zawiera:
+
+- `eval/facts.ts`: wzorzec faktów umowy testowej, odczytany ręcznie ze wszystkich 12 stron (także ze skanu aneksu): wymagane i oczekiwane kwoty z walutą, daty, podmioty, osoby oraz pełny spis wszystkich kwot i dat w dokumencie;
+- `eval/factCheck.ts`: porównanie pobranego pliku `.json` ze wzorcem: zgodność ze schematem, typ, język, data, wymagane wartości (z właściwą walutą), brak wartości spoza dokumentu (zmyślonych, przeliczonych, zgadniętych), brak osób spoza dokumentu, niewykonanie ukrytego polecenia i ostrzeżenie o nim, wzmianka o zmianach z aneksu;
+- `eval/extraction.test.ts`: sprawdzenie, że model w ogóle dostaje wymagane fakty (odczyt pliku tą samą logiką co aplikacja) i że kontrola wartości w aplikacji nie daje fałszywych alarmów na prawdziwym dokumencie.
+
+```bash
+# wynik pobrany z demo (oryginał albo tłumaczenie .en.json)
+FACTS_JSON=~/Downloads/Test_PDF_Insight_umowa_14-2026.insight.json npm run check:facts
+# odczyt samego pliku testowego (nie ma go w repozytorium)
+TEST_PDF=~/Downloads/Test_PDF_Insight_umowa_14-2026.pdf npm run check:facts
+```
+
+Bez tych zmiennych testy z `eval/` są pomijane. Wynik atrapy modelu użytej do zrzutów ekranu przechodzi 25 z 28 sprawdzeń obowiązkowych (brakuje dat początku i końca umowy oraz daty zmiany abonamentu z aneksu), co jest zapisane w `eval/factCheck.test.ts`.
 
 ## Uruchomienie lokalne
 
@@ -128,10 +178,11 @@ Pozostałe polecenia: `npm run lint`, `npm run typecheck`, `npm test`, `npm run 
 1. **Backend:** `npx wrangler login`, potem `npx wrangler secret put GEMINI_API_KEY --config worker/wrangler.toml` i `npm run deploy:worker`. Wrangler wypisze adres `https://pdf-insight-api.<konto>.workers.dev`.
 2. **Frontend:** w repozytorium GitHub ustaw _Settings → Pages → Source: GitHub Actions_ oraz zmienną _Settings → Secrets and variables → Actions → Variables → `VITE_API_URL`_. Każdy push do `main` uruchamia `lint → build → deploy`.
 3. Opcjonalnie: sekrety `CLOUDFLARE_API_TOKEN` i `CLOUDFLARE_ACCOUNT_ID` włączają automatyczny deploy Workera (`.github/workflows/worker.yml`).
+4. **Sprawdzenie wyniku prawdziwego modelu:** w demo wgraj plik testowy, pobierz JSON i uruchom sprawdzarkę faktów (sekcja „Kontrola jakości wyników AI”).
 
 ## Testy
 
-**Vitest, 120 testów jednostkowych:**
+**Vitest, 140 testów jednostkowych** (plus testy `eval/`, uruchamiane po podaniu pliku):
 
 - `src/lib/schema.test.ts`: walidacja schematu (wymagane pola, ISO 8601, ISO 4217, ISO 639-1, liczba zdań i punktów, dodatkowe pola) i żądania (limity, powtórzone strony, obrazy dla nieistniejących stron);
 - `src/lib/localeNumbers.test.ts`: przecinek i kropka dziesiętna (PL/EN), daty polskie, angielskie i ISO, wykrywanie stylu zapisu, porównanie liczb między oryginałem a tłumaczeniem;
@@ -142,10 +193,12 @@ Pozostałe polecenia: `npm run lint`, `npm run typecheck`, `npm test`, `npm run 
 - `src/lib/exports.test.ts`: formatowanie kwot i dat PL/EN, eksport `.md` (polski i angielski, escapowanie), podział dokumentu na fragmenty, wznawianie po limicie zapytań, zgodność słowników PL/EN;
 - `src/lib/history.test.ts`: historia w `localStorage` (limit, uszkodzone dane, zgodność wstecz, ten sam plik, wersja potoku);
 - `src/api/analyze.test.ts`: limit czasu i anulowanie żądania;
+- `worker/src/legitimacy.test.ts`: wiarygodność wyniku: wartości tylko z ukrytego polecenia (1 PLN), niezgodna waluta (8 600 EUR jako PLN), zmyślone kwoty i daty w podsumowaniu, brak fałszywych alarmów, model nie może sam ustawić wyniku kontroli;
+- `eval/factCheck.test.ts`: sprawdzarka faktów na wyniku poprawnym, niepełnym (atrapa) i „zatrutym” (wykonane polecenie, przeliczona waluta, zmyślona osoba i data);
 - `worker/src/worker.test.ts`: analiza z atrapą LLM (ponowienie, map-reduce, części bez pełnego podsumowania, skany, izolacja treści i nazwy pliku, pokrycie, sprawdzanie kwot i dat, HTTP 429, budżet czasu, odmowy i ucięte odpowiedzi, normalizacja formatów), CORS, limity;
 - `worker/src/translate.test.ts`: tłumaczenie wyniku (wartości z oryginału, poprawka polskiego zapisu liczb w tekście angielskim, jawne oznaczenie niezgodności, odrzucenie innej struktury) i dokumentu (kontrola liczb na stronach, pomijanie skanów), walidacja endpointów.
 
-**Playwright, 18 testów E2E** (`e2e/`, uruchamiane w CI przed wdrożeniem): zbudowana aplikacja w Chromium, backend mockowany przez `page.route`, a każde żądanie wysłane przez frontend jest walidowane schematem. Pliki w `e2e/fixtures/` (z generatorem `generate.py`) odtwarzają przypadki, które kiedyś powodowały błędy: skan z nagłówkiem tekstowym, skan JPEG 2000, wypełniony formularz, pusta strona, PDF z hasłem, HTML z rozszerzeniem .pdf. Testy sprawdzają też pobranie JSON, przełącznik PL/EN (zapamiętany po przeładowaniu), wynik po angielsku z angielskim zapisem liczb i pobraniem JSON oraz `.md` w obu językach, tłumaczenie z historii bez nowego zapytania, oznaczenie niezgodnych liczb, tłumaczenie całego dokumentu, komunikaty błędów w języku interfejsu, ponowienie po błędzie API, odrzucenie odpowiedzi niezgodnej ze schematem, wynik z historii dla tego samego pliku, układ przy 360 px i brak naruszeń CSP. Sprawdziłem, że testy faktycznie łapią regresje: po celowym przywróceniu dwóch naprawionych błędów odpowiednie testy nie przechodzą.
+**Playwright, 19 testów E2E** (`e2e/`, uruchamiane w CI przed wdrożeniem): zbudowana aplikacja w Chromium, backend mockowany przez `page.route`, a każde żądanie wysłane przez frontend jest walidowane schematem. Pliki w `e2e/fixtures/` (z generatorem `generate.py`) odtwarzają przypadki, które kiedyś powodowały błędy: skan z nagłówkiem tekstowym, skan JPEG 2000, wypełniony formularz, pusta strona, PDF z hasłem, HTML z rozszerzeniem .pdf. Testy sprawdzają też pobranie JSON, przełącznik PL/EN (zapamiętany po przeładowaniu), wynik po angielsku z angielskim zapisem liczb i pobraniem JSON oraz `.md` w obu językach, tłumaczenie z historii bez nowego zapytania, oznaczenie niezgodnych liczb, tłumaczenie całego dokumentu, komunikaty błędów w języku interfejsu, ponowienie po błędzie API, odrzucenie odpowiedzi niezgodnej ze schematem, wynik z historii dla tego samego pliku, układ przy 360 px i brak naruszeń CSP. Sprawdziłem, że testy faktycznie łapią regresje: po celowym przywróceniu dwóch naprawionych błędów odpowiednie testy nie przechodzą.
 
 ### Przypadki brzegowe sprawdzone w przeglądarce
 
