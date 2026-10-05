@@ -15,6 +15,35 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Łączy sygnał anulowania z limitem czasu. AbortSignal.any jest dostępne dopiero
+ * od Safari 17.4, więc na starszych iPhone'ach każda analiza kończyłaby się błędem.
+ */
+export function withTimeout(
+  signal: AbortSignal,
+  ms: number,
+): { signal: AbortSignal; timedOut: () => boolean; dispose: () => void } {
+  const ctrl = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    ctrl.abort();
+  }, ms);
+  const onAbort = () => {
+    ctrl.abort();
+  };
+  if (signal.aborted) ctrl.abort();
+  else signal.addEventListener('abort', onAbort, { once: true });
+  return {
+    signal: ctrl.signal,
+    timedOut: () => timedOut,
+    dispose: () => {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', onAbort);
+    },
+  };
+}
+
 export function isApiConfigured(): boolean {
   return API_URL.length > 0;
 }
@@ -36,26 +65,32 @@ export async function analyze(request: AnalyzeRequest, signal: AbortSignal): Pro
     );
   }
 
-  const timeout = AbortSignal.timeout(TIMEOUT_MS);
+  const combined = withTimeout(signal, TIMEOUT_MS);
   let res: Response;
-  try {
-    res = await fetch(`${API_URL}/analyze`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-      signal: AbortSignal.any([signal, timeout]),
-    });
-  } catch (e) {
-    if (signal.aborted) throw e;
-    if (timeout.aborted) throw new ApiError('Analiza trwała zbyt długo. Spróbuj ponownie.');
-    throw new ApiError('Brak połączenia z serwerem analizy. Sprawdź internet i spróbuj ponownie.');
-  }
-
   let body: unknown;
   try {
-    body = await res.json();
-  } catch {
-    throw new ApiError(`Serwer zwrócił nieczytelną odpowiedź (HTTP ${res.status}).`);
+    try {
+      res = await fetch(`${API_URL}/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+        signal: combined.signal,
+      });
+    } catch (e) {
+      if (signal.aborted) throw e;
+      if (combined.timedOut()) throw new ApiError('Analiza trwała zbyt długo. Spróbuj ponownie.');
+      throw new ApiError(
+        'Brak połączenia z serwerem analizy. Sprawdź internet i spróbuj ponownie.',
+      );
+    }
+    try {
+      body = await res.json();
+    } catch {
+      if (signal.aborted) throw new DOMException('Anulowano', 'AbortError');
+      throw new ApiError(`Serwer zwrócił nieczytelną odpowiedź (HTTP ${res.status}).`);
+    }
+  } finally {
+    combined.dispose();
   }
 
   if (!res.ok) {
