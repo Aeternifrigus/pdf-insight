@@ -58,8 +58,8 @@ export function ResultView({ insight, notes, onReset }: Props) {
         <aside className="warnings" aria-label="Ostrzeżenia">
           <h3>Na co uważać</h3>
           <ul>
-            {[...analysis.warnings, ...notes].map((w) => (
-              <li key={w}>{w}</li>
+            {[...analysis.warnings, ...notes].map((w, i) => (
+              <li key={`${String(i)}-${w}`}>{w}</li>
             ))}
           </ul>
         </aside>
@@ -75,8 +75,8 @@ export function ResultView({ insight, notes, onReset }: Props) {
       <section className="block" aria-labelledby="points-title">
         <h3 id="points-title">Najważniejsze punkty</h3>
         <ul className="points" lang={doc.language}>
-          {insight.keyPoints.map((p) => (
-            <li key={p}>{p}</li>
+          {insight.keyPoints.map((p, i) => (
+            <li key={`${String(i)}-${p}`}>{p}</li>
           ))}
         </ul>
       </section>
@@ -96,8 +96,8 @@ export function ResultView({ insight, notes, onReset }: Props) {
                   </tr>
                 </thead>
                 <tbody lang={doc.language}>
-                  {insight.amounts.map((a) => (
-                    <tr key={`${a.value}-${a.currency}-${a.context}`}>
+                  {insight.amounts.map((a, i) => (
+                    <tr key={`${String(i)}-${a.currency}-${String(a.value)}`}>
                       <td className="amount">
                         <mark>{formatMoney(a.value, a.currency)}</mark>
                       </td>
@@ -116,8 +116,8 @@ export function ResultView({ insight, notes, onReset }: Props) {
             <Empty>Dokument nie zawiera dat.</Empty>
           ) : (
             <ol className="timeline" lang={doc.language}>
-              {insight.dates.map((d) => (
-                <li key={`${d.date}-${d.context}`}>
+              {insight.dates.map((d, i) => (
+                <li key={`${String(i)}-${d.date}`}>
                   <time dateTime={d.date}>{formatDate(d.date)}</time>
                   <span>{d.context}</span>
                 </li>
@@ -134,8 +134,8 @@ export function ResultView({ insight, notes, onReset }: Props) {
             <Empty>Brak nazw organizacji.</Empty>
           ) : (
             <ul className="plain">
-              {insight.entities.organizations.map((o) => (
-                <li key={o}>{o}</li>
+              {insight.entities.organizations.map((o, i) => (
+                <li key={`${String(i)}-${o}`}>{o}</li>
               ))}
             </ul>
           )}
@@ -146,8 +146,8 @@ export function ResultView({ insight, notes, onReset }: Props) {
             <Empty>Brak nazwisk.</Empty>
           ) : (
             <ul className="plain">
-              {insight.entities.people.map((p) => (
-                <li key={p}>{p}</li>
+              {insight.entities.people.map((p, i) => (
+                <li key={`${String(i)}-${p}`}>{p}</li>
               ))}
             </ul>
           )}
@@ -159,8 +159,8 @@ export function ResultView({ insight, notes, onReset }: Props) {
             <Empty>Brak słów kluczowych.</Empty>
           ) : (
             <ul className="tags" lang={doc.language}>
-              {insight.keywords.map((k) => (
-                <li key={k}>{k}</li>
+              {insight.keywords.map((k, i) => (
+                <li key={`${String(i)}-${k}`}>{k}</li>
               ))}
             </ul>
           )}

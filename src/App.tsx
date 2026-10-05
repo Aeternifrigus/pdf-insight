@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { analyze, ApiError, buildRequest, isApiConfigured } from './api/analyze';
 import { ErrorPanel } from './components/ErrorPanel';
 import { HistoryPanel } from './components/HistoryPanel';
@@ -26,6 +26,19 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>({ kind: 'empty' });
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
   const controller = useRef<AbortController | null>(null);
+
+  // Plik upuszczony poza strefą wgrywania nie może otworzyć się zamiast aplikacji.
+  useEffect(() => {
+    const block = (e: DragEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('dragover', block);
+    window.addEventListener('drop', block);
+    return () => {
+      window.removeEventListener('dragover', block);
+      window.removeEventListener('drop', block);
+    };
+  }, []);
 
   const run = useCallback(async (file: File) => {
     controller.current?.abort();

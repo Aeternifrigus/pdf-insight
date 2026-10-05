@@ -62,10 +62,17 @@ export function ProgressPanel({
           </li>
         ))}
       </ol>
-      <p className="progress-status" role="status" aria-live="polite">
+      <p className="progress-status">
         <span className="spinner" aria-hidden="true" />
-        {detail}
-        <span className="progress-time"> ({seconds} s)</span>
+        {/* Tylko opis etapu jest ogłaszany przez czytnik ekranu; licznik sekund nie,
+            inaczej czytnik powtarzałby komunikat co sekundę. */}
+        <span role="status" aria-live="polite">
+          {detail}
+        </span>
+        <span className="progress-time" aria-hidden="true">
+          {' '}
+          ({seconds} s)
+        </span>
       </p>
       <button type="button" className="button button-ghost" onClick={onCancel}>
         Anuluj
