@@ -8,7 +8,11 @@
 
 ## Mój zakres
 
-Implementację wykonywał Claude (sekcja „Narzędzia”). Po mojej stronie: wymagania wykraczające poza brief, decyzje przy problemach produkcyjnych, przeglądy techniczne, wdrożenie oraz weryfikacja na żywym systemie (logi Workera, pomiary, ewaluacja).
+Implementację wykonywał Claude (sekcja „Narzędzia”). Po mojej stronie:
+
+- **Architektura:** stos z briefu i propozycje Claude oceniałem na bieżąco względem własnego projektu architektury (blueprint); tam, gdzie się rozjeżdżały, wymuszałem zmianę kierunku: darmowe plany zamiast płatnego dostawcy, odrzucenie DeepSeek (brak odczytu skanów), modelu lokalnego i bramki OmniRoute, dodanie Workers AI jako dostawcy mieszczącego pełne dokumenty.
+- **Wymagania wykraczające poza brief:** wersja PL/EN z poprawną notacją liczb, deterministyczna kontrola halucynacji, ewaluacja na danych zewnętrznych, monitoring.
+- **Eksploatacja:** wdrożenie, diagnoza problemów produkcyjnych z logów Workera (HTTP 503, limity tokenów Groq), dobór modeli na podstawie list modeli i zapytań testowych, pomiary i ewaluacja na żywym systemie.
 
 ## Kluczowe zlecenia
 
