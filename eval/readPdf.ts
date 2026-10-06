@@ -5,7 +5,8 @@ import { joinTextItems, type TextItemLike } from '../src/lib/textItems';
 
 /** Tekst stron PDF odczytany tą samą logiką co aplikacja (bez renderowania skanów). */
 export async function readPdfPages(path: string): Promise<{ page: number; text: string }[]> {
-  const pdf = await getDocument({ data: new Uint8Array(readFileSync(path)) }).promise;
+  // verbosity 0: bez ostrzeżeń pdf.js o fontach w Node (tekst jest odczytywany poprawnie).
+  const pdf = await getDocument({ data: new Uint8Array(readFileSync(path)), verbosity: 0 }).promise;
   const pages: { page: number; text: string }[] = [];
   for (let n = 1; n <= pdf.numPages; n++) {
     const page = await pdf.getPage(n);
