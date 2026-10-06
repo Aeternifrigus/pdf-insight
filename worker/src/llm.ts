@@ -35,22 +35,28 @@ export function createLlm(env: Env, fetchFn: FetchFn = fetch): LlmClient {
   const provider = (env.LLM_PROVIDER ?? 'gemini').toLowerCase();
   if (provider === 'gemini') {
     if (!env.GEMINI_API_KEY) throw misconfigured('GEMINI_API_KEY');
-    return new GeminiClient(
+    const gemini = new GeminiClient(
       env.GEMINI_API_KEY,
       geminiModels(env.GEMINI_MODEL, env.GEMINI_FALLBACK_MODELS),
       fetchFn,
     );
+    // Drugi, niezależny dostawca z osobnym darmowym limitem: włączany samą obecnością klucza.
+    return env.OPENAI_API_KEY ? new ChainClient([gemini, openAiClient(env, fetchFn)]) : gemini;
   }
-  if (provider === 'openai') {
-    if (!env.OPENAI_API_KEY) throw misconfigured('OPENAI_API_KEY');
-    return new OpenAiCompatibleClient(
-      env.OPENAI_API_KEY,
-      (env.OPENAI_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/+$/, ''),
-      env.OPENAI_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct',
-      fetchFn,
-    );
-  }
+  if (provider === 'openai') return openAiClient(env, fetchFn);
   throw new AppError('MISCONFIGURED', 500, 'Serwer ma nieprawidłową konfigurację dostawcy AI.');
+}
+
+function openAiClient(env: Env, fetchFn: FetchFn): LlmClient {
+  if (!env.OPENAI_API_KEY) throw misconfigured('OPENAI_API_KEY');
+  const maxTokens = Number(env.OPENAI_MAX_TOKENS);
+  return new OpenAiCompatibleClient(
+    env.OPENAI_API_KEY,
+    (env.OPENAI_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/+$/, ''),
+    env.OPENAI_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct',
+    fetchFn,
+    Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : 8_192,
+  );
 }
 
 function misconfigured(name: string): AppError {
@@ -148,12 +154,17 @@ const MIN_FALLBACK_MS = 5_000;
  * Długie odpowiedzi (tłumaczenie całych stron) dostają pełny czas.
  */
 const PER_MODEL_MS = 25_000;
+/** Czas zostawiany zapasowemu dostawcy w łańcuchu (ChainClient). */
+const BACKUP_RESERVE_MS = 15_000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 12_288;
 
-/** Przy wyczerpaniu listy zgłaszamy najbardziej użyteczny błąd: przeciążenie lub limit, nie 404. */
+/**
+ * Przy wyczerpaniu listy zgłaszamy najbardziej użyteczny błąd: limit (429) lub przeciążenie (5xx)
+ * mówi użytkownikowi „spróbuj za chwilę”, a 404 czy zły klucz zapasowego dostawcy by to zasłoniły.
+ */
 function moreUseful(a: unknown, b: unknown): unknown {
   const rank = (e: unknown) =>
-    e instanceof ProviderError ? (e.status === 404 ? 1 : e.status === 429 ? 3 : 2) : 0;
+    e instanceof ProviderError ? (e.status === 429 ? 3 : e.status >= 500 ? 2 : 1) : 0;
   return rank(b) >= rank(a) ? b : a;
 }
 
@@ -285,6 +296,8 @@ class OpenAiCompatibleClient implements LlmClient {
     private readonly baseUrl: string,
     readonly model: string,
     private readonly fetchFn: FetchFn,
+    /** Górny limit modelu (np. Groq: 8192); większa wartość kończy się błędem 400. */
+    private readonly maxTokensCap = 8_192,
   ) {}
 
   async complete(system: string, turns: Turn[], options: CallOptions = {}): Promise<string> {
@@ -314,7 +327,10 @@ class OpenAiCompatibleClient implements LlmClient {
         model: this.model,
         messages,
         temperature: 0.1,
-        max_tokens: options.maxOutputTokens ?? 12_288,
+        max_tokens: Math.min(
+          options.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+          this.maxTokensCap,
+        ),
         response_format: { type: 'json_object' },
       },
       options.timeoutMs,
@@ -327,5 +343,62 @@ class OpenAiCompatibleClient implements LlmClient {
     }
     if (choice?.finish_reason === 'length') throw new TruncatedResponseError(text);
     return text;
+  }
+}
+
+/**
+ * Łańcuch niezależnych dostawców (np. Gemini, potem Groq). Każdy ma osobny darmowy limit,
+ * więc demo przestaje działać dopiero wtedy, gdy wszystkie są jednocześnie przeciążone
+ * lub wyczerpane. Na kolejnego dostawcę przechodzimy przy każdym błędzie dostawcy poza
+ * odmową filtra treści (422): zły klucz lub nieobsługiwane żądanie u jednego dostawcy
+ * nie musi dotyczyć drugiego.
+ */
+export class ChainClient implements LlmClient {
+  private start = 0;
+  private answered: LlmClient;
+
+  constructor(private readonly clients: LlmClient[]) {
+    const first = clients[0];
+    if (!first) throw new Error('ChainClient wymaga co najmniej jednego klienta');
+    this.answered = first;
+  }
+
+  get model(): string {
+    return this.answered.model;
+  }
+
+  async complete(system: string, turns: Turn[], options: CallOptions = {}): Promise<string> {
+    const deadline = Date.now() + Math.min(options.timeoutMs ?? CALL_TIMEOUT_MS, CALL_TIMEOUT_MS);
+    let worst: unknown = null;
+    for (let i = this.start; i < this.clients.length; i++) {
+      const client = this.clients[i];
+      if (!client) break;
+      const hasNext = i + 1 < this.clients.length;
+      const remaining = deadline - Date.now();
+      // Kolejny dostawca dostaje zarezerwowany czas, inaczej wolny pierwszy zużyłby wszystko.
+      const timeoutMs = hasNext
+        ? Math.max(remaining - BACKUP_RESERVE_MS, remaining / 2)
+        : remaining;
+      try {
+        const text = await client.complete(system, turns, {
+          ...options,
+          timeoutMs: Math.max(1, timeoutMs),
+        });
+        this.start = i;
+        this.answered = client;
+        return text;
+      } catch (e) {
+        if (!(e instanceof ProviderError) || e.status === 422) throw e;
+        worst = moreUseful(worst, e);
+        if (!hasNext || deadline - Date.now() < MIN_FALLBACK_MS) throw worst;
+        console.warn('LLM provider fallback', client.model, '->', this.clients[i + 1]?.model);
+      }
+    }
+    throw worst;
+  }
+
+  reset(): void {
+    this.start = 0;
+    for (const c of this.clients) c.reset?.();
   }
 }

@@ -381,6 +381,78 @@ describe('modele zapasowe Gemini', () => {
   });
 });
 
+describe('zapasowy dostawca (Groq)', () => {
+  const geminiOk = () =>
+    new Response(
+      JSON.stringify({
+        candidates: [{ finishReason: 'STOP', content: { parts: [{ text: good }] } }],
+      }),
+      { status: 200 },
+    );
+  const groqOk = () =>
+    new Response(
+      JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: good } }] }),
+      { status: 200 },
+    );
+  const env = {
+    GEMINI_API_KEY: 'g',
+    GEMINI_MODEL: 'main',
+    OPENAI_API_KEY: 'q',
+    OPENAI_MODEL: 'backup-model',
+  };
+
+  it('bez klucza OPENAI_API_KEY łańcuch nie powstaje', async () => {
+    const urls: string[] = [];
+    const fetchFn = ((u: string) => {
+      urls.push(u);
+      return Promise.resolve(geminiOk());
+    }) as typeof fetch;
+    await analyzeDocument(request, createLlm({ GEMINI_API_KEY: 'g' }, fetchFn));
+    expect(urls.every((u) => u.includes('generativelanguage'))).toBe(true);
+  });
+
+  it('gdy Gemini jest przeciążone, odpowiada Groq z limitem max_tokens 8192', async () => {
+    let groqBody = '';
+    const fetchFn = ((u: string, init: RequestInit) => {
+      if (u.includes('generativelanguage')) {
+        return Promise.resolve(new Response('{"error":{"code":503}}', { status: 503 }));
+      }
+      groqBody = typeof init.body === 'string' ? init.body : '';
+      return Promise.resolve(groqOk());
+    }) as typeof fetch;
+    const result = await analyzeDocument(request, createLlm(env, fetchFn));
+    expect(result.analysis.model).toBe('backup-model');
+    expect(JSON.parse(groqBody)).toMatchObject({ model: 'backup-model', max_tokens: 8192 });
+  });
+
+  it('odmowa filtra treści Gemini nie jest obchodzona innym dostawcą', async () => {
+    const urls: string[] = [];
+    const fetchFn = ((u: string) => {
+      urls.push(u);
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ candidates: [{ finishReason: 'SAFETY', content: { parts: [] } }] }),
+          { status: 200 },
+        ),
+      );
+    }) as typeof fetch;
+    const err = await analyzeDocument(request, createLlm(env, fetchFn)).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: 'AI_REFUSED' });
+    expect(urls.some((u) => u.includes('groq'))).toBe(false);
+  });
+
+  it('zły klucz zapasowego dostawcy nie zasłania przeciążenia Gemini', async () => {
+    const fetchFn = ((u: string) =>
+      Promise.resolve(
+        u.includes('generativelanguage')
+          ? new Response('{"error":{"code":503}}', { status: 503 })
+          : new Response('bad key', { status: 401 }),
+      )) as typeof fetch;
+    const err = await analyzeDocument(request, createLlm(env, fetchFn)).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: 'AI_UNAVAILABLE' });
+  });
+});
+
 describe('odpowiedzi Gemini', () => {
   const gemini = (body: unknown) =>
     createLlm({ GEMINI_API_KEY: 'k' }, () =>

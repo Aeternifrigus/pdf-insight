@@ -2,7 +2,7 @@
 GEMINI_API_KEY=
 # Lokalnie dopuszczamy serwer deweloperski i podgląd Vite (w produkcji tylko GitHub Pages).
 ALLOWED_ORIGINS=http://localhost:5173,http://localhost:4173
-# Alternatywnie dostawca zgodny z OpenAI (np. Groq):
+# Zapasowy dostawca (Groq): sam klucz włącza go po Gemini. LLM_PROVIDER=openai używa go zamiast Gemini.
 # LLM_PROVIDER=openai
 # OPENAI_API_KEY=
 # OPENAI_BASE_URL=https://api.groq.com/openai/v1

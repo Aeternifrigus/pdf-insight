@@ -1,5 +1,8 @@
 export interface Env {
-  /** "gemini" (domyślnie) lub "openai" (dowolne API zgodne z OpenAI, np. Groq). */
+  /**
+   * "gemini" (domyślnie) lub "openai" (dowolne API zgodne z OpenAI, np. Groq).
+   * Przy "gemini" ustawiony OPENAI_API_KEY włącza drugiego dostawcę jako zapasowego.
+   */
   LLM_PROVIDER?: string;
   GEMINI_API_KEY?: string;
   GEMINI_MODEL?: string;
@@ -8,6 +11,8 @@ export interface Env {
   OPENAI_API_KEY?: string;
   OPENAI_BASE_URL?: string;
   OPENAI_MODEL?: string;
+  /** Limit max_tokens dostawcy zgodnego z OpenAI (Groq: 8192). */
+  OPENAI_MAX_TOKENS?: string;
   /** Lista dozwolonych originów oddzielona przecinkami. */
   ALLOWED_ORIGINS?: string;
   /** Opcjonalny binding Cloudflare Rate Limiting (patrz wrangler.toml). */
