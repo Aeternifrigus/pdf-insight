@@ -341,6 +341,36 @@ describe('modele zapasowe Gemini', () => {
     expect(urls.every((u) => u.includes('/models/main:'))).toBe(true);
   });
 
+  it('404 ostatniego modelu nie zasłania przeciążenia pozostałych', async () => {
+    const fetchFn = ((u: string) =>
+      Promise.resolve(
+        u.includes('/models/gone:') ? new Response('not found', { status: 404 }) : overloaded(),
+      )) as typeof fetch;
+    const llm = createLlm(
+      { GEMINI_API_KEY: 'k', GEMINI_MODEL: 'main', GEMINI_FALLBACK_MODELS: 'spare,gone' },
+      fetchFn,
+    );
+    const err = await analyzeDocument(request, llm).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: 'AI_UNAVAILABLE' });
+  });
+
+  it('brak odpowiedzi modelu (timeout) też przełącza na model zapasowy', async () => {
+    const urls: string[] = [];
+    const fetchFn = ((u: string) => {
+      urls.push(u);
+      return u.includes('/models/main:')
+        ? Promise.reject(new DOMException('timed out', 'TimeoutError'))
+        : Promise.resolve(ok());
+    }) as typeof fetch;
+    const llm = createLlm(
+      { GEMINI_API_KEY: 'k', GEMINI_MODEL: 'main', GEMINI_FALLBACK_MODELS: 'spare' },
+      fetchFn,
+    );
+    const result = await analyzeDocument(request, llm);
+    expect(result.analysis.model).toBe('spare');
+    expect(urls).toHaveLength(2);
+  });
+
   it('gdy wszystkie modele są przeciążone, zgłasza chwilową niedostępność', async () => {
     const llm = createLlm(
       { GEMINI_API_KEY: 'k', GEMINI_MODEL: 'main', GEMINI_FALLBACK_MODELS: 'spare' },

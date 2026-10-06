@@ -233,6 +233,7 @@ export async function callModel<S extends z.ZodType>(
           if (!rateLimitRetried && wait <= MAX_RATE_LIMIT_WAIT_MS && fits) {
             rateLimitRetried = true;
             await sleep(wait);
+            llm.reset?.();
             attempt--;
             continue;
           }

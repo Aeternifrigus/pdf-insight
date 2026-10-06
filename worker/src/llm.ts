@@ -23,6 +23,8 @@ export interface CallOptions {
 export interface LlmClient {
   readonly model: string;
   complete(system: string, turns: Turn[], options?: CallOptions): Promise<string>;
+  /** Wraca do modelu głównego (np. po odczekaniu limitu zapytań). */
+  reset?(): void;
 }
 
 type FetchFn = typeof fetch;
@@ -140,41 +142,75 @@ export function isModelSpecificFailure(e: unknown): boolean {
 /** Bez wystarczającego czasu nie ma sensu pytać kolejnego modelu. */
 const MIN_FALLBACK_MS = 5_000;
 
+/**
+ * Limit czasu jednej próby, gdy jest jeszcze model zapasowy. Przeciążony model potrafi też
+ * odpowiadać bardzo wolno; bez limitu zużyłby cały budżet i do modelu zapasowego nie doszłoby.
+ * Długie odpowiedzi (tłumaczenie całych stron) dostają pełny czas.
+ */
+const PER_MODEL_MS = 25_000;
+const DEFAULT_MAX_OUTPUT_TOKENS = 12_288;
+
+/** Przy wyczerpaniu listy zgłaszamy najbardziej użyteczny błąd: przeciążenie lub limit, nie 404. */
+function moreUseful(a: unknown, b: unknown): unknown {
+  const rank = (e: unknown) =>
+    e instanceof ProviderError ? (e.status === 404 ? 1 : e.status === 429 ? 3 : 2) : 0;
+  return rank(b) >= rank(a) ? b : a;
+}
+
 class GeminiClient implements LlmClient {
-  private current = 0;
+  /** Pierwszy model do wypróbowania; po udanym przełączeniu kolejne wywołania zaczynają od niego. */
+  private start = 0;
+  private answered: string;
 
   constructor(
     private readonly apiKey: string,
     private readonly models: string[],
     private readonly fetchFn: FetchFn,
-  ) {}
+  ) {
+    this.answered = models[0] ?? DEFAULT_GEMINI_MODEL;
+  }
 
-  /** Model, który ostatnio odpowiedział (trafia do analysis.model w wyniku). */
+  /** Model, który faktycznie odpowiedział (trafia do analysis.model w wyniku). */
   get model(): string {
-    return this.models[this.current] ?? DEFAULT_GEMINI_MODEL;
+    return this.answered;
   }
 
   /**
-   * Próbuje modeli po kolei. Po udanym przełączeniu kolejne wywołania w tym samym żądaniu
-   * (ponowna próba, części długiego dokumentu) od razu używają działającego modelu.
+   * Próbuje modeli po kolei w ramach jednego budżetu czasu. Indeks jest lokalny, więc dwa
+   * równoległe wywołania (części długiego dokumentu) nie przeskakują sobie nawzajem modeli.
    */
   async complete(system: string, turns: Turn[], options: CallOptions = {}): Promise<string> {
     const deadline = Date.now() + Math.min(options.timeoutMs ?? CALL_TIMEOUT_MS, CALL_TIMEOUT_MS);
+    const longOutput =
+      (options.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS) > DEFAULT_MAX_OUTPUT_TOKENS;
+    let idx = this.start;
+    let worst: unknown = null;
     for (;;) {
+      const model = this.models[idx] ?? DEFAULT_GEMINI_MODEL;
+      const hasNext = idx + 1 < this.models.length;
+      const remaining = deadline - Date.now();
+      const timeoutMs = hasNext && !longOutput ? Math.min(remaining, PER_MODEL_MS) : remaining;
       try {
-        return await this.completeWith(this.model, system, turns, {
+        const text = await this.completeWith(model, system, turns, {
           ...options,
-          timeoutMs: Math.max(1, deadline - Date.now()),
+          timeoutMs: Math.max(1, timeoutMs),
         });
+        this.start = idx;
+        this.answered = model;
+        return text;
       } catch (e) {
-        const hasNext = this.current + 1 < this.models.length;
-        if (!hasNext || !isModelSpecificFailure(e) || deadline - Date.now() < MIN_FALLBACK_MS) {
-          throw e;
-        }
-        console.warn('Gemini fallback', this.model, '->', this.models[this.current + 1]);
-        this.current++;
+        if (!isModelSpecificFailure(e)) throw e;
+        worst = moreUseful(worst, e);
+        if (!hasNext || deadline - Date.now() < MIN_FALLBACK_MS) throw worst;
+        console.warn('Gemini fallback', model, '->', this.models[idx + 1]);
+        idx++;
       }
     }
+  }
+
+  /** Po odczekaniu limitu model główny znowu ma szansę (limit minutowy mógł się odnowić). */
+  reset(): void {
+    this.start = 0;
   }
 
   private async completeWith(
@@ -187,7 +223,7 @@ class GeminiClient implements LlmClient {
       responseMimeType: 'application/json',
       temperature: 0.1,
       // Limit obejmuje też tokeny „myślenia” modelu, więc ma zapas ponad samą odpowiedź JSON.
-      maxOutputTokens: options.maxOutputTokens ?? 12_288,
+      maxOutputTokens: options.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
     };
     const thinkingConfig = thinkingConfigFor(model);
     if (thinkingConfig) generationConfig.thinkingConfig = thinkingConfig;
