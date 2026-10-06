@@ -20,7 +20,9 @@
     "test:watch": "vitest",
     "deploy:worker": "wrangler deploy --config worker/wrangler.toml",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
-    "check:facts": "vitest run eval --reporter=verbose"
+    "check:facts": "vitest run eval --reporter=verbose",
+    "eval:invoices": "vitest run eval/corpus.test.ts --reporter=verbose",
+    "live:check": "node scripts/live-check.mjs"
   },
   "dependencies": {
     "@fontsource/jetbrains-mono": "5.3.0",

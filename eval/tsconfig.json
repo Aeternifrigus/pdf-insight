@@ -22,6 +22,9 @@
     "../src/lib/forms.ts",
     "../src/lib/injection.ts",
     "../src/lib/grounding.ts",
-    "../src/lib/localeNumbers.ts"
+    "../src/lib/localeNumbers.ts",
+    "../src/lib/verify.ts",
+    "../src/lib/merge.ts",
+    "../src/lib/ocrCoverage.ts"
   ]
 }
