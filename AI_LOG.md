@@ -139,7 +139,9 @@ Znaczniki czasu commitów pokazują faktyczny moment zapisu. Pierwsze 11 commit�
 
 50. **Sprawdzenie wyniku prawdziwego modelu.** Wynik z demo (Gemini) pobrany jako JSON i sprawdzony `npm run check:facts`: 28/28 faktów obowiązkowych, 9/17 uzupełniających, zero zmyślonych wartości i nazw, polecenie ze strony 4 zignorowane i zgłoszone, zmiany z aneksu (skan) w podsumowaniu. Wcześniejsze zrzuty i opisy pochodziły z atrapy modelu; to jest pierwszy pomiar prawdziwego wyniku.
 
+51. **Kontrola opisu kwot.** Prompt: _„can we make it do it?”_ (o ograniczeniu: kontrola sprawdza obecność wartości, ale nie to, czy kwota netto nie została opisana jako brutto). Dodane: dla każdej liczby w dokumencie zbierane są słowa netto/brutto i okres (miesięcznie/rocznie, także po angielsku) tuż po niej, a gdy ich tam nie ma, tuż przed nią; okno kończy się na sąsiedniej liczbie, bo w umowie „12 300,00 PLN netto (15 129,00 PLN brutto)” słowo „brutto” należy do drugiej kwoty. Opis kwoty z wyniku i kwoty w podsumowaniu są porównywane z tymi słowami; brak informacji po którejś stronie nie jest zarzutem. Sprawdzenie na prawdziwej umowie: 10 poprawnych opisów bez fałszywego alarmu, zamiany netto/brutto i okresu wykryte; w przeglądarce oznaczenie przy kwocie i ostrzeżenie z obiema wersjami.
+
 ## Weryfikacja
 
-- `npm run lint`, `npm run typecheck`, `npm test` (166 testów), `npm run test:e2e` (21 testów) i `npm run build` przechodzą bez błędów i ostrzeżeń. `npm run check:facts` z plikiem testowym: 27 sprawdzeń odczytu i kontroli wartości na prawdziwym dokumencie.
+- `npm run lint`, `npm run typecheck`, `npm test` (169 testów), `npm run test:e2e` (21 testów) i `npm run build` przechodzą bez błędów i ostrzeżeń. `npm run check:facts` z plikiem testowym: 27 sprawdzeń odczytu i kontroli wartości na prawdziwym dokumencie.
 - Test end-to-end w headless Chromium na pliku testowym i na nietypowych PDF-ach (tabela w README): odczyt 12 stron, strona 11 wyrenderowana do JPEG i wysłana do modelu, ostrzeżenie o instrukcji ze strony 4, brak poziomego przewijania przy 360 px, pobranie pliku `.json`, historia po przeładowaniu, komunikat błędu dla pliku, który nie jest PDF-em.
