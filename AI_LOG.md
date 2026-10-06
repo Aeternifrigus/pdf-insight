@@ -3,7 +3,7 @@
 ## Narzędzia
 
 - **Claude (Opus 5.5) w aplikacji Claude**, w trybie z dostępem do terminala i plików: analiza briefu, projekt architektury, implementacja, testy i dokumentacja. Claude uruchamiał komendy (`npm`, `tsc`, `eslint`, `vitest`, `wrangler dev`) i sam sprawdzał wyniki.
-- **Google Gemini** (domyślnie `gemini-3.8-flash`) jako model używany przez aplikację w produkcji (podsumowanie, ekstrakcja danych, odczyt skanów, tłumaczenie). Pierwotnie `gemini-2.5-flash`, zmieniony w piątym przeglądzie.
+- **Google Gemini** (domyślnie `gemini-3.5-flash`, zapasowe `gemini-3.8-flash` i `gemini-3.5-flash-lite`) jako model używany przez aplikację w produkcji (podsumowanie, ekstrakcja danych, odczyt skanów, tłumaczenie). Pierwotnie `gemini-2.5-flash`, zmieniony w piątym przeglądzie.
 - Do testu end-to-end w przeglądarce użyto lokalnej atrapy API zgodnej z OpenAI (zwraca gotowy JSON), headless Chromium i `wrangler dev`. Dzięki temu cały przepływ (pdf.js, render skanu, Worker, walidacja, UI) został sprawdzony bez zużywania limitów.
 
 ## Mój zakres
@@ -160,6 +160,8 @@ Znaczniki czasu commitów pokazują faktyczny moment zapisu. Pierwsze 11 commit�
 52. **Dowody poza umową testową, pomiar i monitoring.** Zlecenie: ewaluacja na zewnętrznych dokumentach ze wzorcem odpowiedzi, pomiar limitu 30 s z perspektywy użytkownika i monitoring demo. Dodane: 11 faktur open source z poprawnymi odpowiedziami (invoice2data, MIT) z testem offline i ewaluacją na żywym API; skrypt `live:check` mierzący demo z zewnątrz (nowa przeglądarka, wolne łącze mobilne) i robiący zrzuty ekranu; workflow monitoringu co 6 godzin i logi Workera. Już pierwszy przebieg offline znalazł błąd w kontroli dat: daty po francusku, niderlandzku, skrótem angielskim i bez zer były fałszywie zgłaszane jako „spoza dokumentu”, czego umowa testowa (po polsku) nie mogła ujawnić. Próba na sucho skryptu pomiarowego z atrapą AI (3 s): 4,0 s na zwykłym łączu, 12,5 s na wolnym mobilnym, gdzie OCR nie zdąża i wynik pokazuje się bez niego, zgodnie z założeniem.
 
 53. **Pierwsze wyniki na żywo i precyzja kontroli.** Faktury open source na wdrożonym API: 94% zgodności ze wzorcem. Kontrole aplikacji oznaczyły 4 pozycje i ręczne sprawdzenie w PDF-ach pokazało, że wszystkie 4 to fałszywe alarmy: komórki tabeli sklejone spacją, kropki tysięcy, rok dwucyfrowy i zakres dat ze wspólnym rokiem. To był najsłabszy punkt wskazany w przeglądzie („nikt nie zmierzył, jak często kontrole krzyczą bez powodu”), a pomiar go potwierdził. Poprawki z testami regresji, sprawdzenie, że wykrywanie prawdziwych problemów na umowie testowej nie osłabło, oraz tryb ponownej oceny zapisanych wyników bez zużywania limitu. Pomiar czasu demo (26,7 s i 29,9 s przy limicie 30 s) skłonił do ograniczenia list do 15 pozycji, bo czas rośnie z długością odpowiedzi; na umowie testowej wcześniejszy wynik miał 28/28 faktów obowiązkowych i 17/17 uzupełniających, więc zapas na skrócenie był.
+
+54. **Zmiana modelu głównego na podstawie danych.** Wyniki na żywo pokazały, że `gemini-3.8-flash` był często przeciążony: 5 z 11 faktur i pomiar czasu umowy obsłużył model zapasowy `gemini-3.5-flash`, który na umowie dał 28/28 faktów obowiązkowych w 9,6 s. Kolejność odwrócona: 3.5-flash główny, 3.8-flash zapasowy. Skrypt pomiaru robi teraz 3 przebiegi na profil i podaje medianę zamiast pojedynczego pomiaru.
 
 ## Weryfikacja
 
