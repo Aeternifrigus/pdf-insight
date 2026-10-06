@@ -35,8 +35,7 @@
       "value": 278.61,
       "currency": "INR",
       "context": "Net price of the memory card",
-      "foundInText": false,
-      "issue": "notInText"
+      "foundInText": true
     },
     {
       "value": 40.39,

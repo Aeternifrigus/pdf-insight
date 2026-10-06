@@ -63,8 +63,7 @@
     {
       "date": "2014-05-21",
       "context": "Zahlungsziel (termin płatności)",
-      "foundInText": false,
-      "issue": "notInText"
+      "foundInText": true
     }
   ],
   "keywords": [

@@ -46,8 +46,7 @@
       "value": 3441812,
       "currency": "EUR",
       "context": "Capital social de Free SAS",
-      "foundInText": false,
-      "issue": "notInText"
+      "foundInText": true
     }
   ],
   "dates": [

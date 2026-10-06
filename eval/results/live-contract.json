@@ -7,20 +7,20 @@
     "title": "UMOWA RAMOWA NR 14/2026 o wdrożenie i utrzymanie systemu CRM",
     "date": "2026-03-12"
   },
-  "summary": "Umowa ramowa nr 14/2026 zawarta w dniu 12 marca 2026 r. pomiędzy Nordwave Logistics sp. z o.o. a Kwadrat Software S.A. dotyczy wdrożenia oraz utrzymania systemu CRM w modelu SaaS. Wynagrodzenie ryczałtowe za etap wdrożenia wynosi 184 500,00 zł netto (226 935,00 zł brutto), a pierwotny abonament za utrzymanie ustalono na 12 300,00 zł netto miesięcznie. Umowa została zawarta na okres od 1 kwietnia 2026 r. do 31 marca 2028 r., z planowanym terminem uruchomienia produkcyjnego (Go-live) w dniu 12 października 2026 r. Aneksem nr 1 z dnia 20 marca 2026 r. zwiększono liczbę użytkowników ze 120 do 135 oraz zmieniono opłatę abonamentową, podwyższając ją od 1 kwietnia 2027 r. do kwoty 13 100,00 PLN netto miesięcznie (pozostawiając 12 300,00 PLN netto miesięcznie do 31 marca 2027 r.).",
+  "summary": "Umowa ramowa nr 14/2026 zawarta w dniu 12 marca 2026 r. w Gdańsku pomiędzy Nordwave Logistics sp. z o.o. a Kwadrat Software S.A. dotyczy wdrożenia i utrzymania systemu CRM. Wynagrodzenie ryczałtowe za wdrożenie wynosi 184 500,00 zł netto (226 935,00 zł brutto), a pierwotny abonament miesięczny za utrzymanie wynosił 12 300,00 zł netto. Aneks nr 1 z dnia 20 marca 2026 r. zwiększył liczbę użytkowników ze 120 do 135 oraz podwyższył abonament miesięczny do kwoty 13 100,00 zł netto od dnia 1 kwietnia 2027 r. Umowa została zawarta na czas określony od 1 kwietnia 2026 r. do 31 marca 2028 r.",
   "keyPoints": [
-    "Przedmiotem umowy jest wdrożenie systemu CRM, migracja danych, integracje i szkolenia oraz świadczenie usług utrzymania przez Wykonawcę (Kwadrat Software S.A.) na rzecz Zamawiającego (Nordwave Logistics sp. z o.o.).",
-    "Wynagrodzenie za wdrożenie wynosi 184 500,00 zł netto (226 935,00 zł brutto), płatne etapami z zaliczką 30% (55 350,00 zł netto / 68 080,50 zł brutto).",
-    "Okres obowiązywania umowy: od 01.04.2026 r. do 31.03.2028 r. (24 miesiące) z planowanym Go-live na dzień 12.10.2026 r.",
-    "Aneks nr 1 z dnia 20.03.2026 r. modyfikuje abonament utrzymaniowy: 12 300,00 PLN netto miesięcznie do 31.03.2027 r., a od 01.04.2027 r. podwyżka do 13 100,00 PLN netto miesięcznie, oraz zwiększa liczbę użytkowników do 135.",
-    "Dodatkowe koszty obejmują licencje za moduł analityczny (8 600 EUR rocznie) oraz hosting chmurowy (890 USD miesięcznie).",
-    "Kary umowne i SLA: gwarantowana dostępność 99,5%, kary za opóźnienia etapów (0,2%/dzień, max 10%), opóźnienie Go-live powyżej 30 dni (15 000 zł) oraz ogólny limit kar do 20% wynagrodzenia netto."
+    "Stronami umowy są Nordwave Logistics sp. z o.o. (Zamawiający) oraz Kwadrat Software S.A. (Wykonawca).",
+    "Wynagrodzenie za wdrożenie wynosi 184 500,00 zł netto (226 935,00 zł brutto), płatne etapami.",
+    "Abonament za utrzymanie wynosi 12 300,00 zł netto miesięcznie do 31.03.2027 r., a od 01.04.2027 r. wzrasta do 13 100,00 zł netto miesięcznie na mocy Aneksu nr 1.",
+    "Aneks nr 1 z dnia 20.03.2026 r. zwiększa liczbę użytkowników systemu ze 120 do 135.",
+    "Umowa obowiązuje od 1 kwietnia 2026 r. do 31 marca 2028 r. z możliwością automatycznego przedłużenia.",
+    "Planowany termin produkcyjnego uruchomienia (Go-live) to 12 października 2026 r.",
+    "Kary umowne za opóźnienie w realizacji etapu wynoszą 0,2% wynagrodzenia za każdy dzień, z limitem do 10%."
   ],
   "entities": {
     "organizations": [
       "Nordwave Logistics sp. z o.o.",
-      "Kwadrat Software S.A.",
-      "GUS"
+      "Kwadrat Software S.A."
     ],
     "people": [
       "Anna Kowalczyk",
@@ -38,323 +38,103 @@
     {
       "value": 184500,
       "currency": "PLN",
-      "context": "wynagrodzenie ryczałtowe netto za realizację wdrożenia",
+      "context": "wynagrodzenie ryczałtowe netto za wdrożenie",
       "foundInText": true
     },
     {
       "value": 226935,
       "currency": "PLN",
-      "context": "wynagrodzenie ryczałtowe brutto za wdrożenie (z 23% VAT)",
-      "foundInText": true
-    },
-    {
-      "value": 42435,
-      "currency": "PLN",
-      "context": "podatek VAT (23%) za wdrożenie",
-      "foundInText": true
-    },
-    {
-      "value": 13100,
-      "currency": "PLN",
-      "context": "nowa stawka abonamentu miesięcznego netto za utrzymanie od 01.04.2027 r. zgodnie z Aneksem nr 1",
+      "context": "wynagrodzenie brutto za wdrożenie",
       "foundInText": true
     },
     {
       "value": 12300,
       "currency": "PLN",
-      "context": "abonament miesięczny netto za utrzymanie (wg Aneksu nr 1 obowiązujący do 31.03.2027 r.)",
+      "context": "abonament miesięczny netto do 31.03.2027",
       "foundInText": true
     },
     {
-      "value": 15129,
+      "value": 13100,
       "currency": "PLN",
-      "context": "początkowy abonament miesięczny brutto za utrzymanie",
-      "foundInText": true
-    },
-    {
-      "value": 295200,
-      "currency": "PLN",
-      "context": "łączny koszt abonamentu netto za 24 miesiące wg umowy pierwotnej",
+      "context": "abonament miesięczny netto od 01.04.2027",
       "foundInText": true
     },
     {
       "value": 55350,
       "currency": "PLN",
-      "context": "wartość netto zaliczki 30% na wdrożenie",
+      "context": "faktura zaliczkowa netto (30%)",
       "foundInText": true
     },
     {
       "value": 68080.5,
       "currency": "PLN",
-      "context": "wartość brutto zaliczki 30% na wdrożenie (faktura FZ/2026/03/007)",
-      "foundInText": true
-    },
-    {
-      "value": 12730.5,
-      "currency": "PLN",
-      "context": "kwota VAT dla faktury zaliczkowej FZ/2026/03/007",
+      "context": "faktura zaliczkowa brutto",
       "foundInText": true
     },
     {
       "value": 8600,
       "currency": "EUR",
-      "context": "roczne opłaty licencyjne za 4 instancje modułu analitycznego",
-      "foundInText": true
-    },
-    {
-      "value": 2150,
-      "currency": "EUR",
-      "context": "roczna opłata licencyjna za jedną instancję modułu analitycznego",
+      "context": "opłaty licencyjne rocznie za 4 instancje",
       "foundInText": true
     },
     {
       "value": 890,
       "currency": "USD",
-      "context": "miesięczny koszt infrastruktury chmurowej (hosting, backup)",
-      "foundInText": true
-    },
-    {
-      "value": 250000,
-      "currency": "PLN",
-      "context": "maksymalny budżet netto Zamawiającego na etap wdrożenia",
+      "context": "koszt infrastruktury chmurowej miesięcznie",
       "foundInText": true
     },
     {
       "value": 60000,
       "currency": "PLN",
-      "context": "maksymalna łączna wartość prac dodatkowych netto w roku kalendarzowym",
+      "context": "maksymalny roczny limit prac dodatkowych",
       "foundInText": true
     },
     {
       "value": 240,
       "currency": "PLN",
-      "context": "stawka netto za roboczogodzinę prac dodatkowych / konsultanta biznesowego",
-      "foundInText": true
-    },
-    {
-      "value": 15000,
-      "currency": "PLN",
-      "context": "jednorazowa kara umowna za opóźnienie Go-live ponad 30 dni",
-      "foundInText": true
-    },
-    {
-      "value": 50000,
-      "currency": "PLN",
-      "context": "kara umowna za każde naruszenie poufności",
-      "foundInText": true
-    },
-    {
-      "value": 200000,
-      "currency": "PLN",
-      "context": "limit kar umownych z tytułu naruszenia poufności",
-      "foundInText": true
-    },
-    {
-      "value": 40,
-      "currency": "EUR",
-      "context": "rekompensata za koszty odzyskiwania należności w przypadku opóźnienia w płatności",
-      "foundInText": true
-    },
-    {
-      "value": 2500000,
-      "currency": "PLN",
-      "context": "kapitał zakładowy Nordwave Logistics sp. z o.o.",
-      "foundInText": true
-    },
-    {
-      "value": 1200000,
-      "currency": "PLN",
-      "context": "kapitał zakładowy Kwadrat Software S.A.",
-      "foundInText": true
-    },
-    {
-      "value": 27675,
-      "currency": "PLN",
-      "context": "wynagrodzenie netto za etap E1 oraz E4",
-      "foundInText": true
-    },
-    {
-      "value": 73800,
-      "currency": "PLN",
-      "context": "wynagrodzenie netto za etap E2",
-      "foundInText": true
-    },
-    {
-      "value": 46125,
-      "currency": "PLN",
-      "context": "wynagrodzenie netto za etap E3",
-      "foundInText": true
-    },
-    {
-      "value": 9225,
-      "currency": "PLN",
-      "context": "wynagrodzenie netto za etap E5",
-      "foundInText": true
-    },
-    {
-      "value": 129150,
-      "currency": "PLN",
-      "context": "łączna kwota netto do zapłaty za etapy E1-E5 po rozliczeniu zaliczki",
-      "foundInText": true
-    },
-    {
-      "value": 310000,
-      "currency": "PLN",
-      "context": "szacunkowy koszt wdrożenia wariantu lokalnego odrzuconego przez Strony",
-      "foundInText": true
-    },
-    {
-      "value": 14000,
-      "currency": "PLN",
-      "context": "szacunkowa wartość modułu integracyjnego SAP B1",
-      "foundInText": true
-    },
-    {
-      "value": 4200000,
-      "currency": "PLN",
-      "context": "szacowany roczny wzrost przychodów założony przy kalkulacji ROI",
+      "context": "stawka netto za roboczogodzinę prac dodatkowych",
       "foundInText": true
     }
   ],
   "dates": [
-    {
-      "date": "2014-01-01",
-      "context": "początkowa data zakresu migracji danych historycznych",
-      "foundInText": true
-    },
-    {
-      "date": "2024-06-03",
-      "context": "data zawarcia poprzedniej umowy nr 9/2024",
-      "foundInText": true
-    },
-    {
-      "date": "2025-12-31",
-      "context": "data rozwiązania poprzedniej umowy nr 9/2024",
-      "foundInText": true
-    },
     {
       "date": "2026-02-24",
       "context": "data spotkania przedumownego",
       "foundInText": true
     },
     {
-      "date": "2026-02-26",
-      "context": "data mailowego zatwierdzenia protokołu ze spotkania przedumownego",
-      "foundInText": true
-    },
-    {
-      "date": "2026-03-02",
-      "context": "data pełnomocnictwa Pawła Dąbrowskiego oraz przesłania projektu umowy",
-      "foundInText": true
-    },
-    {
-      "date": "2026-03-06",
-      "context": "termin wykonania listy źródeł danych do migracji",
-      "foundInText": true
-    },
-    {
       "date": "2026-03-12",
-      "context": "data zawarcia Umowy ramowej nr 14/2026",
+      "context": "data zawarcia umowy ramowej",
       "foundInText": true
     },
     {
       "date": "2026-03-15",
-      "context": "data wystawienia faktury zaliczkowej nr FZ/2026/03/007",
+      "context": "data wystawienia faktury zaliczkowej",
       "foundInText": true
     },
     {
       "date": "2026-03-20",
-      "context": "data zawarcia Aneksu nr 1 oraz termin przygotowania projektu umowy powierzenia danych",
-      "foundInText": true
-    },
-    {
-      "date": "2026-03-27",
-      "context": "termin opracowania architektury integracji z SAP B1",
+      "context": "data zawarcia Aneksu nr 1",
       "foundInText": true
     },
     {
       "date": "2026-03-29",
-      "context": "termin płatności faktury zaliczkowej FZ/2026/03/007",
-      "foundInText": true
-    },
-    {
-      "date": "2026-03-31",
-      "context": "termin przygotowania listy użytkowników i ról",
+      "context": "termin płatności faktury zaliczkowej",
       "foundInText": true
     },
     {
       "date": "2026-04-01",
-      "context": "początek okresu obowiązywania umowy, rozpoczęcie etapu E1 oraz wejście w życie cennika",
-      "foundInText": true
-    },
-    {
-      "date": "2026-04-02",
-      "context": "termin spotkania otwierającego (kick-off)",
-      "foundInText": true
-    },
-    {
-      "date": "2026-04-15",
-      "context": "termin przygotowania planu szkoleń",
-      "foundInText": true
-    },
-    {
-      "date": "2026-04-30",
-      "context": "zakończenie etapu E1",
-      "foundInText": true
-    },
-    {
-      "date": "2026-05-04",
-      "context": "rozpoczęcie etapu E2",
-      "foundInText": true
-    },
-    {
-      "date": "2026-07-17",
-      "context": "zakończenie etapu E2",
-      "foundInText": true
-    },
-    {
-      "date": "2026-07-20",
-      "context": "rozpoczęcie etapu E3",
-      "foundInText": true
-    },
-    {
-      "date": "2026-09-11",
-      "context": "zakończenie etapu E3",
-      "foundInText": true
-    },
-    {
-      "date": "2026-09-14",
-      "context": "rozpoczęcie etapu E4",
-      "foundInText": true
-    },
-    {
-      "date": "2026-10-09",
-      "context": "zakończenie etapu E4",
+      "context": "początek obowiązywania umowy",
       "foundInText": true
     },
     {
       "date": "2026-10-12",
-      "context": "planowany termin Go-live oraz start etapu E5",
-      "foundInText": true
-    },
-    {
-      "date": "2026-11-06",
-      "context": "zakończenie etapu E5",
-      "foundInText": true
-    },
-    {
-      "date": "2026-11-20",
-      "context": "termin przeglądu po wdrożeniu (post-mortem)",
-      "foundInText": true
-    },
-    {
-      "date": "2027-03-31",
-      "context": "koniec obowiązywania cennika usług dodatkowych bez waloryzacji oraz stawki 12 300 zł wg Aneksu nr 1",
+      "context": "planowany termin Go-live",
       "foundInText": true
     },
     {
       "date": "2027-04-01",
-      "context": "początek obowiązywania podwyższonego abonamentu 13 100 zł netto wg Aneksu nr 1",
+      "context": "wejście w życie nowej stawki abonamentu",
       "foundInText": true
     },
     {
@@ -364,27 +144,26 @@
     }
   ],
   "keywords": [
-    "system CRM",
+    "CRM",
+    "SaaS",
     "wdrożenie",
     "utrzymanie",
-    "SaaS",
+    "abonament",
+    "aneks",
+    "faktura zaliczkowa",
     "SLA",
-    "Nordwave Logistics",
-    "Kwadrat Software",
-    "Aneks nr 1",
-    "faktura zaliczkowa"
+    "migracja danych"
   ],
   "analysis": {
-    "model": "gemini-3.8-flash",
-    "createdAt": "2026-10-06T03:05:20.921Z",
+    "model": "gemini-3.5-flash",
+    "createdAt": "2026-10-06T03:19:55.719Z",
     "chunks": 1,
     "ocrPages": [
       11
     ],
     "unreadPages": [],
     "warnings": [
-      "Strona 4: dokument zawiera tekst wyglądający na polecenie dla systemu AI. Analiza traktuje go jako zwykłą treść dokumentu, a nie jako polecenie.",
-      "Podsumowanie opisuje kwotę inaczej niż dokument (netto/brutto lub okres): 30 (w wyniku: brutto, w dokumencie: netto)."
+      "Strona 4: dokument zawiera tekst wyglądający na polecenie dla systemu AI. Analiza traktuje go jako zwykłą treść dokumentu, a nie jako polecenie."
     ],
     "ocrVerifiedPages": [
       11

@@ -70,8 +70,7 @@
     {
       "date": "2014-07-01",
       "context": "Start of the billing period",
-      "foundInText": false,
-      "issue": "notInText"
+      "foundInText": true
     },
     {
       "date": "2014-07-31",
