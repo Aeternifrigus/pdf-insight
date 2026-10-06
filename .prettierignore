@@ -5,3 +5,5 @@ worker/.wrangler
 public/pdfjs
 test-results
 playwright-report
+eval/results
+public/ocr
