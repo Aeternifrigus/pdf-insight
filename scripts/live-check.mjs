@@ -24,6 +24,9 @@ if (!pdf) {
   process.exit(1);
 }
 
+/** Przebiegi na profil (domyślnie 3): raport podaje medianę zamiast pojedynczego pomiaru. */
+const RUNS = Math.max(1, Number(process.env.RUNS ?? 3));
+
 const profiles = [
   { name: 'Zwykłe łącze (komputer)', slow: false },
   { name: 'Wolny internet mobilny (1,6 Mb/s, 150 ms, CPU ×4)', slow: true },
@@ -37,7 +40,8 @@ const browser = await chromium.launch(
 const rows = [];
 let screenshotsTaken = false;
 
-for (const [i, profile] of profiles.entries()) {
+const plan = profiles.flatMap((p) => Array.from({ length: RUNS }, (_, run) => ({ ...p, run })));
+for (const [i, profile] of plan.entries()) {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     locale: 'pl-PL',
@@ -54,7 +58,14 @@ for (const [i, profile] of profiles.entries()) {
     });
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   }
-  const row = { profile: profile.name, load: 0, toResult: 0, model: '', note: '' };
+  const row = {
+    profile: profile.name,
+    run: profile.run + 1,
+    load: 0,
+    toResult: 0,
+    model: '',
+    note: '',
+  };
   try {
     let t = Date.now();
     await page.goto(url, { waitUntil: 'load' });
@@ -107,7 +118,7 @@ for (const [i, profile] of profiles.entries()) {
   }
   rows.push(row);
   console.log(
-    `${row.profile}: strona ${(row.load / 1000).toFixed(1)} s, wynik ${(row.toResult / 1000).toFixed(1)} s, ${row.model} ${row.note}`,
+    `${row.profile} #${String(row.run)}: strona ${(row.load / 1000).toFixed(1)} s, wynik ${(row.toResult / 1000).toFixed(1)} s, ${row.model} ${row.note}`,
   );
   await context.close();
 }
@@ -119,11 +130,26 @@ const report = [
   '',
   `Adres: ${url}. Data: ${new Date().toISOString()}. Plik: ${pdf.split('/').pop()}. Każdy przebieg w nowej przeglądarce, bez pamięci podręcznej i historii.`,
   '',
-  '| Warunki | Wczytanie strony | Od wgrania pliku do podsumowania | Limit 30 s | Model | Uwagi |',
-  '| --- | --: | --: | :-: | --- | --- |',
+  `## Podsumowanie (${String(RUNS)} przebiegi na profil)`,
+  '',
+  '| Warunki | Udane | Mediana do podsumowania | Najgorszy | Limit 30 s |',
+  '| --- | :-: | --: | --: | :-: |',
+  ...profiles.map((p) => {
+    const ok = rows.filter((r) => r.profile === p.name && r.model).map((r) => r.toResult);
+    ok.sort((a, b) => a - b);
+    const median = ok.length ? (ok.at(Math.floor((ok.length - 1) / 2)) ?? 0) : 0;
+    const worst = ok.at(-1) ?? 0;
+    const all = rows.filter((r) => r.profile === p.name).length;
+    return `| ${p.name} | ${String(ok.length)}/${String(all)} | ${ok.length ? s(median) : '–'} | ${ok.length ? s(worst) : '–'} | ${ok.length === all && worst < 30_000 ? '✓' : '✗'} |`;
+  }),
+  '',
+  '## Przebiegi',
+  '',
+  '| Warunki | Przebieg | Wczytanie strony | Od wgrania pliku do podsumowania | Limit 30 s | Model | Uwagi |',
+  '| --- | :-: | --: | --: | :-: | --- | --- |',
   ...rows.map(
     (r) =>
-      `| ${r.profile} | ${s(r.load)} | ${s(r.toResult)} | ${r.model && r.toResult < 30_000 ? '✓' : '✗'} | ${r.model || '–'} | ${r.note} |`,
+      `| ${r.profile} | ${String(r.run)} | ${s(r.load)} | ${s(r.toResult)} | ${r.model && r.toResult < 30_000 ? '✓' : '✗'} | ${r.model || '–'} | ${r.note} |`,
   ),
   '',
 ].join('\n');
