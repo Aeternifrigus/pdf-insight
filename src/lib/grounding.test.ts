@@ -3,6 +3,7 @@ import {
   amountInText,
   buildEvidence,
   checkAmount,
+  checkDate,
   dateInText,
   foldForSearch,
   numbersInText,
@@ -71,5 +72,31 @@ describe('buildEvidence: liczby przełamane między wierszami', () => {
     );
     expect(checkAmount(295200, 'PLN', ev)).toBe('ok');
     expect(checkAmount(12300, 'PLN', ev)).toBe('ok');
+  });
+});
+
+describe('fałszywe alarmy znalezione na fakturach open source', () => {
+  it('komórki tabeli sklejone spacją („1 278.61”) nie ukrywają ceny', () => {
+    const ev = buildEvidence([{ text: 'Qty Price\n1 278.61 14.50%\nTotal 319.00 USD 12.00' }]);
+    expect(checkAmount(278.61, 'INR', ev)).toBe('ok');
+  });
+
+  it('kropki jako separator tysięcy w dokumencie z kropką dziesiętną', () => {
+    const ev = buildEvidence([{ text: 'Total 29.99 EUR. Free SAS au capital de 3.441.812 Euros' }]);
+    expect(checkAmount(3441812, 'EUR', ev)).toBe('ok');
+    expect(checkAmount(29.99, 'EUR', ev)).toBe('ok');
+  });
+
+  it('rok dwucyfrowy i początek zakresu dat ze wspólnym rokiem', () => {
+    const ev = buildEvidence([
+      {
+        text: 'Zahlungsziel 21.05.14. Billing period July 1 - July 31 , 2014. Okres: 1-31 lipca 2026.',
+      },
+    ]);
+    expect(checkDate('2014-05-21', ev)).toBe('ok');
+    expect(checkDate('2014-07-01', ev)).toBe('ok');
+    expect(checkDate('2026-07-01', ev)).toBe('ok');
+    // Zgadnięty rok bez zakresu nadal jest oznaczany.
+    expect(checkDate('2015-07-01', ev)).toBe('notInText');
   });
 });

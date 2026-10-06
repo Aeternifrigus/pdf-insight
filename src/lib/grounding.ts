@@ -42,6 +42,24 @@ export function numbersInText(text: string, style: DecimalStyle = 'unknown'): Se
     const word = /^\s*([a-ząćęłńóśźż]+)\.?/i.exec(after)?.[1]?.toLowerCase();
     const mult = word ? MULTIPLIERS[word] : undefined;
     if (mult) values.add(round2(token.value * mult));
+    // Spacja to separator tysięcy albo granica komórek tabeli: „1 278.61” w fakturze to
+    // „ilość 1” i „cena 278.61”, a nie 1 278,61. Dodajemy też końcówki takiej liczby.
+    if (/\s/.test(token.raw)) {
+      const parts = token.raw.split(/\s+/);
+      for (let k = 1; k < parts.length; k++) {
+        for (const t of parseNumbers(parts.slice(k).join(' '), style)) {
+          if (t.index === 0) values.add(t.value);
+        }
+      }
+    }
+  }
+  // Grupy tysięcy zapisane separatorem, który w tym dokumencie jest dziesiętny, są jednoznaczne,
+  // gdy grup jest co najmniej dwie: „3.441.812 Euros” w dokumencie z „29.99” to 3 441 812.
+  for (const m of rest.matchAll(/(?<![\d.,])\d{1,3}(?:\.\d{3}){2,}(?![\d.,])/g)) {
+    values.add(Number(m[0].replace(/\./g, '')));
+  }
+  for (const m of rest.matchAll(/(?<![\d.,])\d{1,3}(?:,\d{3}){2,}(?![\d.,])/g)) {
+    values.add(Number(m[0].replace(/,/g, '')));
   }
   return values;
 }
@@ -171,8 +189,16 @@ export function dateInText(iso: string, folded: string): boolean {
   const mi = Number(m) - 1;
   const dd = String(Number(d));
   const mm = String(Number(m));
+  const yy = y.slice(2);
   const numeric = [
     `${d}.${m}.${y}`,
+    // Rok dwucyfrowy („Zahlungsziel 21.05.14”).
+    `${d}.${m}.${yy}`,
+    `${dd}.${mm}.${yy}`,
+    `${d}/${m}/${yy}`,
+    `${dd}/${mm}/${yy}`,
+    `${m}/${d}/${yy}`,
+    `${d}-${m}-${yy}`,
     `${dd}.${mm}.${y}`,
     `${d}/${m}/${y}`,
     `${dd}/${mm}/${y}`,
@@ -202,7 +228,33 @@ export function dateInText(iso: string, folded: string): boolean {
       `${name} ${day} ${y}`,
     ]),
   );
-  return [...numeric, ...verbal].some((v) => containsStandalone(folded, v));
+  if ([...numeric, ...verbal].some((v) => containsStandalone(folded, v))) return true;
+  return inDateRange(folded, months, days, y);
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Data jako początek zakresu ze wspólnym rokiem: „July 1 - July 31, 2014”, „1-31 lipca 2026”,
+ * „od 1 do 31 lipca 2026”, „1. - 31. Mai 2014”. Rok stoi wtedy tylko przy drugiej dacie,
+ * więc wcześniej poprawna data początku zakresu była zgłaszana jako „spoza dokumentu”.
+ */
+function inDateRange(folded: string, months: string[], days: string[], y: string): boolean {
+  const dash = '\\s?[-–]\\s?';
+  for (const name of months.map(escapeRe)) {
+    for (const day of days.map(escapeRe)) {
+      const patterns = [
+        `${name} ${day}${dash}(?:\\p{L}+\\.? )?\\d{1,2}(?:st|nd|rd|th)?,? ${y}`,
+        `${day}\\.?${dash}\\d{1,2}\\.? ${name} ${y}`,
+        `od ${day} do \\d{1,2} ${name} ${y}`,
+        `${day}\\.? ${name}${dash}\\d{1,2}\\.? \\p{L}+ ${y}`,
+      ];
+      for (const p of patterns) {
+        if (new RegExp(`(?<![\\p{L}\\d])${p}(?!\\d)`, 'u').test(folded)) return true;
+      }
+    }
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
