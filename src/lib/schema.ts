@@ -150,6 +150,11 @@ export const analysisMetaSchema = z.object({
   unreadPages: z.array(z.number().int().min(1)).default([]),
   warnings: z.array(nonEmpty),
   translation: translationMetaSchema.optional(),
+  /**
+   * Wynik od zapasowego dostawcy (Groq, Workers AI), gdy Gemini nie odpowiadało. Taki wynik
+   * bywa mniej kompletny, więc nie jest używany ponownie z historii dla tego samego pliku.
+   */
+  backup: z.boolean().optional(),
 });
 
 export const insightSchema = z.object({

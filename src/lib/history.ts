@@ -132,8 +132,12 @@ export function findByHash(
   fileHash: string,
   store: StorageLike | null = storage(),
 ): HistoryEntry | undefined {
+  // Wynik od zapasowego dostawcy nie blokuje pełniejszej analizy przy ponownym wgraniu pliku.
   return loadHistory(store).find(
-    (e) => e.fileHash === fileHash && e.pipelineVersion === PIPELINE_VERSION,
+    (e) =>
+      e.fileHash === fileHash &&
+      e.pipelineVersion === PIPELINE_VERSION &&
+      !e.insight.analysis.backup,
   );
 }
 

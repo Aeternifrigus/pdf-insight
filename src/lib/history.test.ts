@@ -41,6 +41,14 @@ describe('history', () => {
     expect(findByHash('zzz', store)).toBeUndefined();
   });
 
+  it('wynik od zapasowego dostawcy nie jest używany ponownie dla tego samego pliku', () => {
+    const store = memoryStore();
+    const insight = sampleInsight();
+    addToHistory({ ...insight, analysis: { ...insight.analysis, backup: true } }, store, 'abc');
+    expect(loadHistory(store)).toHaveLength(1);
+    expect(findByHash('abc', store)).toBeUndefined();
+  });
+
   it('nie używa ponownie wyniku z innej wersji potoku', () => {
     const store = memoryStore();
     store.setItem(

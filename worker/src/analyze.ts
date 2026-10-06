@@ -31,6 +31,10 @@ import {
 export const CHUNK_CHARS = 150_000;
 export const MAX_CHUNKS = 4;
 const CONCURRENCY = 2;
+
+/** Ostrzeżenie dla użytkownika, gdy wynik pochodzi od zapasowego dostawcy AI. */
+export const BACKUP_WARNING =
+  'Główny model AI był chwilowo niedostępny, więc analizę wykonał model zapasowy. Wynik może być mniej kompletny (np. pominąć kwoty w walutach obcych lub zmiany z aneksu). Aby uzyskać pełniejszy wynik, przeanalizuj plik ponownie za kilka minut.';
 /** Najdłuższe oczekiwanie na zwolnienie limitu dostawcy (HTTP 429) przed jedną ponowną próbą. */
 const MAX_RATE_LIMIT_WAIT_MS = 15_000;
 
@@ -445,7 +449,8 @@ export async function analyzeDocument(
       chunks: chunks.length,
       ocrPages: req.images.map((i) => i.page).sort((a, b) => a - b),
       unreadPages: req.unreadPages,
-      warnings: lists.warnings,
+      warnings: llm.usedBackup ? [BACKUP_WARNING, ...lists.warnings] : lists.warnings,
+      ...(llm.usedBackup ? { backup: true } : {}),
     },
   };
 

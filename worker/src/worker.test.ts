@@ -4,6 +4,7 @@ import { insightSchema, type AnalyzeRequest } from '../../src/lib/schema';
 import { combineWarnings, groundLists, verifyInsight } from '../../src/lib/verify';
 import {
   analyzeDocument,
+  BACKUP_WARNING,
   extractJson,
   normalizeModelJson,
   parseUnambiguousNumber,
@@ -325,6 +326,8 @@ describe('modele zapasowe Gemini', () => {
     const result = await analyzeDocument(request, llm);
     expect(urls.map((u) => /models\/([^:]+):/.exec(u)?.[1])).toEqual(['main', 'spare']);
     expect(result.analysis.model).toBe('spare');
+    // Inny model Gemini to ten sam dostawca i podobna jakość: bez ostrzeżenia o zapasowym.
+    expect(result.analysis.backup).toBeUndefined();
   });
 
   it('nie zmienia modelu przy złym kluczu (403)', async () => {
@@ -498,6 +501,8 @@ describe('Cloudflare Workers AI (trzeci dostawca)', () => {
     const llm = createLlm({ ...base, OPENAI_API_KEY: 'q', AI: ai.AI }, fetchFn);
     const result = await analyzeDocument(request, llm);
     expect(result.analysis.model).toBe('@cf/test/model');
+    expect(result.analysis.backup).toBe(true);
+    expect(result.analysis.warnings[0]).toBe(BACKUP_WARNING);
     expect(ai.calls[0]?.inputs).toMatchObject({
       max_tokens: 8192,
       response_format: { type: 'json_object' },

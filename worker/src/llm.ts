@@ -22,6 +22,8 @@ export interface CallOptions {
 
 export interface LlmClient {
   readonly model: string;
+  /** Czy ostatnio odpowiedział zapasowy dostawca (inny niż pierwszy w łańcuchu). */
+  readonly usedBackup?: boolean;
   complete(system: string, turns: Turn[], options?: CallOptions): Promise<string>;
   /** Wraca do modelu głównego (np. po odczekaniu limitu zapytań). */
   reset?(): void;
@@ -393,6 +395,10 @@ export class ChainClient implements LlmClient {
 
   get model(): string {
     return this.answered.model;
+  }
+
+  get usedBackup(): boolean {
+    return this.answered !== this.clients[0];
   }
 
   async complete(system: string, turns: Turn[], options: CallOptions = {}): Promise<string> {
