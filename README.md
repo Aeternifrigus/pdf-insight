@@ -10,7 +10,7 @@ Aplikacja webowa, która wczytuje plik PDF, tworzy jego krótkie podsumowanie i 
 
 ![Zrzut ekranu: ten sam wynik w interfejsie angielskim, po przetłumaczeniu](docs/screenshot-en.png)
 
-_Zrzuty z wdrożonego demo (prawdziwy model), wykonane 6.10.2026 skryptem `npm run live:check`._
+_Zrzuty z wdrożonego demo (prawdziwy model), wykonane 2026-10-06 skryptem `npm run live:check`._
 
 ## W skrócie (dla recenzenta)
 

@@ -7,15 +7,14 @@
     "title": "UMOWA RAMOWA NR 14/2026 o wdrożenie i utrzymanie systemu CRM",
     "date": "2026-03-12"
   },
-  "summary": "Umowa ramowa nr 14/2026 zawarta w dniu 12 marca 2026 r. w Gdańsku pomiędzy Nordwave Logistics sp. z o.o. a Kwadrat Software S.A. dotyczy wdrożenia i utrzymania systemu CRM. Wynagrodzenie ryczałtowe za wdrożenie wynosi 184 500,00 zł netto (226 935,00 zł brutto), a pierwotny abonament miesięczny za utrzymanie wynosił 12 300,00 zł netto. Aneks nr 1 z dnia 20 marca 2026 r. zwiększył liczbę użytkowników ze 120 do 135 oraz podwyższył abonament miesięczny do kwoty 13 100,00 zł netto od dnia 1 kwietnia 2027 r. Umowa została zawarta na czas określony od 1 kwietnia 2026 r. do 31 marca 2028 r.",
+  "summary": "Umowa ramowa nr 14/2026 zawarta 12 marca 2026 r. pomiędzy Nordwave Logistics sp. z o.o. a Kwadrat Software S.A. dotyczy wdrożenia i utrzymania systemu CRM w modelu SaaS. Wynagrodzenie ryczałtowe za wdrożenie wynosi 184 500,00 PLN netto, a pierwotny miesięczny abonament za utrzymanie wynosił 12 300,00 PLN netto. Aneks nr 1 z dnia 20 marca 2026 r. zwiększył liczbę użytkowników do 135 oraz ustalił, że od 1 kwietnia 2027 r. abonament wzrośnie do 13 100,00 PLN netto. Umowa została zawarta na czas określony od 1 kwietnia 2026 r. do 31 marca 2028 r.",
   "keyPoints": [
-    "Stronami umowy są Nordwave Logistics sp. z o.o. (Zamawiający) oraz Kwadrat Software S.A. (Wykonawca).",
-    "Wynagrodzenie za wdrożenie wynosi 184 500,00 zł netto (226 935,00 zł brutto), płatne etapami.",
-    "Abonament za utrzymanie wynosi 12 300,00 zł netto miesięcznie do 31.03.2027 r., a od 01.04.2027 r. wzrasta do 13 100,00 zł netto miesięcznie na mocy Aneksu nr 1.",
-    "Aneks nr 1 z dnia 20.03.2026 r. zwiększa liczbę użytkowników systemu ze 120 do 135.",
-    "Umowa obowiązuje od 1 kwietnia 2026 r. do 31 marca 2028 r. z możliwością automatycznego przedłużenia.",
-    "Planowany termin produkcyjnego uruchomienia (Go-live) to 12 października 2026 r.",
-    "Kary umowne za opóźnienie w realizacji etapu wynoszą 0,2% wynagrodzenia za każdy dzień, z limitem do 10%."
+    "Przedmiotem umowy jest wdrożenie systemu CRM dla 135 użytkowników (zwiększone aneksem ze 120) oraz jego późniejsze utrzymanie.",
+    "Wynagrodzenie za wdrożenie wynosi 184 500,00 PLN netto, płatne etapami po odbiorach.",
+    "Abonament za utrzymanie wynosi 12 300,00 PLN netto miesięcznie do 31 marca 2027 r., a od 1 kwietnia 2027 r. wzrasta do 13 100,00 PLN netto miesięcznie na mocy Aneksu nr 1.",
+    "Dodatkowe koszty obejmują licencje roczne w kwocie 8 600 EUR oraz hosting w wysokości 890 USD miesięcznie.",
+    "Umowa obowiązuje od 1 kwietnia 2026 r. do 31 marca 2028 r. z możliwością automatycznego przedłużenia o 12 miesięcy.",
+    "Planowany termin Go-live to 12 października 2026 r."
   ],
   "entities": {
     "organizations": [
@@ -38,7 +37,7 @@
     {
       "value": 184500,
       "currency": "PLN",
-      "context": "wynagrodzenie ryczałtowe netto za wdrożenie",
+      "context": "wynagrodzenie netto za wdrożenie",
       "foundInText": true
     },
     {
@@ -60,51 +59,34 @@
       "foundInText": true
     },
     {
-      "value": 55350,
-      "currency": "PLN",
-      "context": "faktura zaliczkowa netto (30%)",
-      "foundInText": true
-    },
-    {
-      "value": 68080.5,
-      "currency": "PLN",
-      "context": "faktura zaliczkowa brutto",
-      "foundInText": true
-    },
-    {
       "value": 8600,
       "currency": "EUR",
-      "context": "opłaty licencyjne rocznie za 4 instancje",
+      "context": "roczne opłaty licencyjne",
       "foundInText": true
     },
     {
       "value": 890,
       "currency": "USD",
-      "context": "koszt infrastruktury chmurowej miesięcznie",
+      "context": "miesięczny koszt infrastruktury chmurowej",
       "foundInText": true
     },
     {
-      "value": 60000,
+      "value": 55350,
       "currency": "PLN",
-      "context": "maksymalny roczny limit prac dodatkowych",
+      "context": "zaliczka netto 30%",
       "foundInText": true
     },
     {
-      "value": 240,
+      "value": 68080.5,
       "currency": "PLN",
-      "context": "stawka netto za roboczogodzinę prac dodatkowych",
+      "context": "zaliczka brutto 30%",
       "foundInText": true
     }
   ],
   "dates": [
     {
-      "date": "2026-02-24",
-      "context": "data spotkania przedumownego",
-      "foundInText": true
-    },
-    {
       "date": "2026-03-12",
-      "context": "data zawarcia umowy ramowej",
+      "context": "data zawarcia umowy",
       "foundInText": true
     },
     {
@@ -114,7 +96,7 @@
     },
     {
       "date": "2026-03-20",
-      "context": "data zawarcia Aneksu nr 1",
+      "context": "data zawarcia aneksu nr 1",
       "foundInText": true
     },
     {
@@ -133,30 +115,24 @@
       "foundInText": true
     },
     {
-      "date": "2027-04-01",
-      "context": "wejście w życie nowej stawki abonamentu",
-      "foundInText": true
-    },
-    {
       "date": "2028-03-31",
-      "context": "koniec podstawowego okresu obowiązywania umowy",
+      "context": "koniec obowiązywania umowy",
       "foundInText": true
     }
   ],
   "keywords": [
     "CRM",
-    "SaaS",
     "wdrożenie",
     "utrzymanie",
+    "SaaS",
     "abonament",
     "aneks",
-    "faktura zaliczkowa",
-    "SLA",
-    "migracja danych"
+    "zaliczka",
+    "SLA"
   ],
   "analysis": {
     "model": "gemini-3.5-flash",
-    "createdAt": "2026-10-06T03:19:55.719Z",
+    "createdAt": "2026-10-06T04:20:22.479Z",
     "chunks": 1,
     "ocrPages": [
       11
