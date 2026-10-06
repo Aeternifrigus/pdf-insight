@@ -99,6 +99,7 @@ for (const [i, profile] of profiles.entries()) {
             clip: { x: 0, y: 0, width: 1280, height: 1500 },
           })
           .catch(() => page.screenshot({ path: join(root, 'docs', 'screenshot-en.png') }));
+        screenshotsTaken = true;
       }
     }
   } catch (e) {

@@ -10,9 +10,7 @@ Aplikacja webowa, która wczytuje plik PDF, tworzy jego krótkie podsumowanie i 
 
 ![Zrzut ekranu: ten sam wynik w interfejsie angielskim, po przetłumaczeniu](docs/screenshot-en.png)
 
-_Zrzuty pochodzą z testu przeglądarkowego z atrapą modelu („mock-model”); wynik prawdziwego modelu widać w demo._
-
-<!-- Przed oddaniem: podmienić oba zrzuty na wynik z wdrożonego demo (Gemini) i usunąć zdanie powyżej. -->
+_Zrzuty z wdrożonego demo (prawdziwy model), wykonane 6.10.2026 skryptem `npm run live:check`._
 
 ## W skrócie (dla recenzenta)
 
@@ -172,7 +170,7 @@ Umowa testowa to jeden dokument, a aplikacja była na nim strojona. Dlatego `eva
 
 ### Pomiar demo z zewnątrz
 
-`npm run live:check -- /ścieżka/umowa.pdf` (po jednorazowym `npx playwright install chromium`) otwiera wdrożone demo w nowej przeglądarce bez pamięci podręcznej, wgrywa plik i mierzy czas do podsumowania na zwykłym łączu oraz na symulowanym wolnym internecie mobilnym (1,6 Mb/s, 150 ms, procesor 4× wolniejszy). Zapisuje raport `eval/results/live-timing.md`, wynik do sprawdzarki faktów i zrzuty ekranu do README. Pierwszy pomiar (listy do 30 kwot i 30 dat): 26,7 s na zwykłym łączu i 29,9 s na wolnym mobilnym, czyli tuż pod limitem 30 s. Czas rośnie z długością odpowiedzi modelu, więc listy ograniczono do 15 pozycji w kolejności ważności (odpadają pojedyncze pozycje cenników, nie fakty wymagane); aktualny wynik pomiaru jest w raporcie.
+`npm run live:check -- /ścieżka/umowa.pdf` (po jednorazowym `npx playwright install chromium`) otwiera wdrożone demo w nowej przeglądarce bez pamięci podręcznej, wgrywa plik i mierzy czas do podsumowania na zwykłym łączu oraz na symulowanym wolnym internecie mobilnym (1,6 Mb/s, 150 ms, procesor 4× wolniejszy). Zapisuje raport `eval/results/live-timing.md`, wynik do sprawdzarki faktów i zrzuty ekranu do README. Pierwszy pomiar (listy do 30 kwot i 30 dat): 26,7 s na zwykłym łączu i 29,9 s na wolnym mobilnym, czyli tuż pod limitem 30 s. Czas rośnie z długością odpowiedzi modelu, więc listy ograniczono do 15 pozycji w kolejności ważności (odpadają pojedyncze pozycje cenników, nie fakty wymagane); po zmianie: 9,6 s i 17,3 s. W drugim pomiarze odpowiadał `gemini-3.5-flash` (główny `gemini-3.8-flash` był przeciążony), więc część poprawy wynika ze zmiany modelu, nie tylko z krótszej odpowiedzi. Koszt skrócenia list: na umowie testowej nadal 28/28 faktów obowiązkowych, ale 11/17 uzupełniających zamiast 17/17. Na wolnym łączu OCR skanów nie zdążył, więc wartości ze skanu zostały oznaczone jako niesprawdzone (zgodnie z założeniem).
 
 ### Sprawdzarka faktów
 
