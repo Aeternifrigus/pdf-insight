@@ -14,6 +14,16 @@ _Zrzuty pochodzą z testu przeglądarkowego z atrapą modelu („mock-model”);
 
 <!-- Przed oddaniem: podmienić oba zrzuty na wynik z wdrożonego demo (Gemini) i usunąć zdanie powyżej. -->
 
+## W skrócie (dla recenzenta)
+
+- **Działanie:** wgraj PDF (do 10 MB, także skany) i dostaniesz podsumowanie w języku dokumentu oraz JSON zgodny ze schematem z briefu, zwalidowany Zod-em po obu stronach. Czas zmierzony z zewnątrz, w nowej przeglądarce i na wolnym łączu mobilnym: [`eval/results/live-timing.md`](eval/results/live-timing.md).
+- **Architektura:** React + Vite + TypeScript na GitHub Pages, Cloudflare Worker jako proxy (klucz API, CORS tylko dla demo, limity), Gemini z zapasowymi Groq i Cloudflare Workers AI. Plik PDF nie opuszcza przeglądarki; do API trafia tekst stron i obrazy skanów.
+- **Jakość zmierzona, nie deklarowana:** umowa testowa: 28 z 28 faktów obowiązkowych, zero zmyślonych wartości, ukryte polecenie zignorowane i zgłoszone. 11 faktur open source (4 języki, licencja MIT) ze wzorcem odpowiedzi: [`eval/results/invoices.md`](eval/results/invoices.md).
+- **Kontrola halucynacji bez AI:** każda kwota, data, nazwa firmy i osoby oraz opis netto/brutto i okresu jest sprawdzany z tekstem dokumentu; skany są czytane niezależnie przez OCR w przeglądarce. Wynik jest oznaczany, nie cenzurowany.
+- **Bezpieczeństwo:** klucz tylko w sekretach Workera (zero kluczy w historii Git), CSP, treść PDF jako dane w bloku z losowym znacznikiem, heurystyka wykrywania poleceń dla AI, oznaczanie wartości pochodzących z takich poleceń.
+- **Niezawodność:** trzy modele Gemini, Groq i Workers AI, każdy z osobnym darmowym limitem; wynik od modelu zapasowego jest oznaczony. Monitoring co 6 godzin: [`.github/workflows/monitor.yml`](.github/workflows/monitor.yml).
+- **Testy:** 180 jednostkowych, 21 end-to-end w przeglądarce (CI przed każdym wdrożeniem), ewaluacja na prawdziwych dokumentach. Ograniczenia opisane wprost w sekcji „Znane ograniczenia”.
+
 ## Co potrafi
 
 | Wymaganie                                                             | Status                      | Gdzie                                                           |
@@ -150,6 +160,17 @@ Sprawdzone na umowie testowej z zmyślonymi wartościami w odpowiedzi: OCR potwi
 
 OCR pobiera ok. 6,5 MB (rdzeń WASM i polski model `best_int`, serwowane z własnej domeny, bez CDN) tylko wtedy, gdy dokument ma skany. Jeśli nie zdąży (limit 3 s po odpowiedzi AI) albo się nie uda, wartości ze skanów zostają oznaczone jako niesprawdzone, jak wcześniej.
 
+### Faktury open source ze wzorcem odpowiedzi
+
+Umowa testowa to jeden dokument, a aplikacja była na nim strojona. Dlatego `eval/corpus/invoice2data/` zawiera 11 faktur z projektu open source [invoice2data](https://github.com/invoice-x/invoice2data) (licencja MIT, plik `LICENSE` obok): po angielsku, francusku, niemiecku i niderlandzku, z USA, Europy i Indii, każda z plikiem JSON z poprawnymi danymi (wystawca, kwota, kwota netto, data, numer, waluta).
+
+- **Offline, w `npm test`:** kontrole aplikacji potwierdzają prawdziwą kwotę i datę każdej faktury i oznaczają zmyśloną. Ten test od razu znalazł błąd: daty zapisane po francusku („02 Juillet 2015”), niderlandzku („29 maart 2014”), skrótem („Jan 1, 2022”) i bez zer („8-9-2022”) były zgłaszane jako „spoza dokumentu”. Poprawione.
+- **Na żywym API:** `LIVE_API=https://pdf-insight-api.<konto>.workers.dev npm run eval:invoices` wysyła każdą fakturę do wdrożonego backendu (z odstępem 7 s ze względu na limit), przepuszcza wynik przez te same kontrole co przeglądarka i porównuje ze wzorcem. Raport: `eval/results/invoices.md`, wyniki: `eval/results/*.json`.
+
+### Pomiar demo z zewnątrz
+
+`npm run live:check -- /ścieżka/umowa.pdf` (po jednorazowym `npx playwright install chromium`) otwiera wdrożone demo w nowej przeglądarce bez pamięci podręcznej, wgrywa plik i mierzy czas do podsumowania na zwykłym łączu oraz na symulowanym wolnym internecie mobilnym (1,6 Mb/s, 150 ms, procesor 4× wolniejszy). Zapisuje raport `eval/results/live-timing.md`, wynik do sprawdzarki faktów i zrzuty ekranu do README.
+
 ### Sprawdzarka faktów
 
 Jakość wyników to 20% oceny, a model można sprawdzić tylko na prawdziwym dokumencie. Katalog `eval/` zawiera:
@@ -255,6 +276,12 @@ Każdy plik przeszedł przez prawdziwy interfejs w headless Chromium (z atrapą 
 | Wynik po angielsku (pełny stos: frontend, Worker, atrapa modelu)   | „PLN 184,500.00” zamiast „184 500,00 zł”, kontrola liczb potwierdzona          |
 | Tłumaczenie dokumentu z polskim zapisem liczb w tekście angielskim | raport „wrong notation” na każdej takiej stronie, bez fałszywych różnic        |
 | Interfejs EN, tryb ciemny, 360 px                                  | brak naruszeń axe-core i poziomego przewijania                                 |
+
+## Monitoring
+
+- **Co 6 godzin** workflow `monitor.yml` sprawdza stronę demo, `/health` i jedną prawdziwą analizę krótkiej faktury (4 zapytania dziennie z darmowego limitu). Nieudany przebieg GitHub zgłasza e-mailem właścicielowi repozytorium; ostrzeżenia (model zapasowy, czas powyżej 30 s) widać w podsumowaniu przebiegu.
+- **Logi Workera** są włączone (`[observability]` w `wrangler.toml`) i dostępne w panelu Cloudflare: błędy dostawców i przełączenia na modele zapasowe.
+- **Ograniczenie:** API jest publiczne z założenia (statyczny frontend nie ma czym się uwierzytelnić), a CORS nie chroni przed skryptami. Przed nadużyciem chronią limity na adres IP; ktoś z wieloma adresami może wyczerpać darmowe limity, co monitoring wykryje, ale nie zablokuje.
 
 ## Znane ograniczenia
 
