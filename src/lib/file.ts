@@ -4,7 +4,13 @@ export const MAX_FILE_BYTES = 10 * 1024 * 1024;
  * Błąd odczytu PDF jako kod + parametry; tekst komunikatu powstaje w interfejsie
  * w wybranym języku (PL/EN).
  */
-export type PdfErrorCode = 'PASSWORD' | 'CORRUPT' | 'TOO_MANY_PAGES' | 'TOO_MUCH_TEXT';
+export type PdfErrorCode =
+  | 'PASSWORD'
+  | 'CORRUPT'
+  | 'TOO_MANY_PAGES'
+  | 'TOO_MUCH_TEXT'
+  /** Plik się otworzył, ale odczyt każdej strony zakończył się wyjątkiem. */
+  | 'UNREADABLE';
 
 export class PdfReadError extends Error {
   constructor(

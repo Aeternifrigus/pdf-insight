@@ -1,8 +1,16 @@
-import { getDocument, GlobalWorkerOptions, OPS, PasswordException } from 'pdfjs-dist';
-import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
+// Wersja „legacy” zawiera polyfille: pdf.js 6 używa m.in. Math.sumPrecise, którego starsze
+// przeglądarki (Chrome przed 147, starsze Safari) nie mają. Bez tego każda strona kończyła się
+// wyjątkiem, a użytkownik widział mylący komunikat „W pliku nie ma tekstu”.
+import {
+  getDocument,
+  GlobalWorkerOptions,
+  OPS,
+  PasswordException,
+} from 'pdfjs-dist/legacy/build/pdf.mjs';
+import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist/legacy/build/pdf.mjs';
 // Import z ?url sprawia, że Vite kopiuje workera do dist/ i zwraca ścieżkę z uwzględnieniem `base`
 // (na GitHub Pages: /<repo>/assets/pdf.worker-*.mjs). Bez tego worker pdf.js zwraca 404.
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import { PdfReadError } from './file';
 import { formFieldLines } from './forms';
 import {
@@ -119,6 +127,10 @@ export async function extractPdf(
         info.push({ page: n, textChars: 0, hasImages: true });
       }
       onProgress?.(n, pdf.numPages);
+      // Wszystkie strony z wyjątkiem to problem przeglądarki lub pliku, a nie brak tekstu.
+      if (n === pdf.numPages && failed.length === pdf.numPages) {
+        throw new PdfReadError('UNREADABLE');
+      }
       // Przerywamy od razu, zamiast czytać setki kolejnych stron tylko po to, żeby odrzucić plik.
       if (totalChars > MAX_TEXT_CHARS) {
         throw new PdfReadError('TOO_MUCH_TEXT', { page: n, total: pdf.numPages });

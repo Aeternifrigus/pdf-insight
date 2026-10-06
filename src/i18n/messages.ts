@@ -75,6 +75,8 @@ export const pl = {
     BAD_SIGNATURE: 'Plik ma rozszerzenie .pdf, ale jego zawartość nie jest PDF-em.',
     PASSWORD: 'Plik jest zabezpieczony hasłem. Usuń hasło i spróbuj ponownie.',
     CORRUPT: 'Nie udało się otworzyć pliku. Może być uszkodzony.',
+    UNREADABLE:
+      'Przeglądarka nie odczytała żadnej strony tego pliku. Spróbuj w aktualnej wersji Chrome, Edge, Firefox lub Safari.',
     TOO_MANY_PAGES: (n: number) => `Plik ma ${String(n)} stron. Limit to 2000 stron.`,
     TOO_MUCH_TEXT: (limit: string, page: number, total: number) =>
       `Dokument ma ponad ${limit} znaków tekstu (przekroczone na stronie ${String(page)} z ${String(total)}). Spróbuj krótszego pliku.`,
@@ -261,6 +263,8 @@ export const en: Messages = {
     BAD_SIGNATURE: 'The file has a .pdf extension, but its content is not a PDF.',
     PASSWORD: 'The file is password-protected. Remove the password and try again.',
     CORRUPT: 'The file could not be opened. It may be damaged.',
+    UNREADABLE:
+      'Your browser could not read any page of this file. Try the latest Chrome, Edge, Firefox or Safari.',
     TOO_MANY_PAGES: (n) => `The file has ${String(n)} pages. The limit is 2,000 pages.`,
     TOO_MUCH_TEXT: (limit, page, total) =>
       `The document has more than ${limit} characters of text (exceeded on page ${String(page)} of ${String(total)}). Try a shorter file.`,
