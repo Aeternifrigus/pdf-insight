@@ -1,0 +1,57 @@
+name: Monitoring demo
+
+# Co 6 godzin (i na żądanie) sprawdza, czy demo działa tak, jak zobaczy je recenzent:
+# strona GitHub Pages, backend (/health) i prawdziwa, krótka analiza przez AI.
+# Nieudany przebieg zaplanowanego workflow GitHub zgłasza e-mailem właścicielowi repozytorium.
+# Jedna analiza co 6 godzin to 4 zapytania dziennie z darmowego limitu.
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Strona, backend i analiza
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DEMO_URL: https://aeternifrigus.github.io/pdf-insight/
+      DEMO_ORIGIN: https://aeternifrigus.github.io
+      API_URL: ${{ vars.VITE_API_URL }}
+    steps:
+      - name: Strona demo odpowiada
+        run: |
+          code=$(curl -s -o page.html -w '%{http_code}' "$DEMO_URL")
+          test "$code" = 200 || { echo "::error::Strona demo zwróciła HTTP $code"; exit 1; }
+          grep -q 'PDF Insight' page.html || { echo "::error::Strona nie zawiera aplikacji"; exit 1; }
+
+      - name: Backend odpowiada (/health)
+        run: |
+          test -n "$API_URL" || { echo "::error::Brak zmiennej repozytorium VITE_API_URL"; exit 1; }
+          curl -sf "$API_URL/health" | grep -q '"ok":true' || { echo "::error::Backend nie odpowiada"; exit 1; }
+
+      - name: Prawdziwa analiza krótkiego dokumentu
+        run: |
+          cat > req.json <<'JSON'
+          {"fileName":"monitoring.pdf","pageCount":1,"images":[],"unreadPages":[],
+           "pages":[{"page":1,"text":"Faktura VAT nr FV/7/2026 z dnia 05.10.2026. Sprzedawca: Alfa sp. z o.o. Nabywca: Beta S.A. Usługa doradcza: 1 000,00 zł netto, VAT 23%: 230,00 zł, razem do zapłaty 1 230,00 zł brutto. Termin płatności: 19.10.2026."}]}
+          JSON
+          start=$(date +%s)
+          code=$(curl -s -o res.json -w '%{http_code}' -X POST "$API_URL/analyze" \
+            -H 'Content-Type: application/json' -H "Origin: $DEMO_ORIGIN" --data @req.json)
+          took=$(( $(date +%s) - start ))
+          echo "HTTP $code w ${took} s"
+          test "$code" = 200 || { echo "::error::Analiza zwróciła HTTP $code: $(head -c 300 res.json)"; exit 1; }
+          model=$(jq -r '.analysis.model' res.json)
+          backup=$(jq -r '.analysis.backup // false' res.json)
+          jq -e '.summary | length > 20' res.json > /dev/null || { echo "::error::Brak podsumowania"; exit 1; }
+          jq -e '[.amounts[].value] | index(1230)' res.json > /dev/null || echo "::warning::W wyniku brak kwoty 1230 zł"
+          echo "Model: $model, zapasowy: $backup"
+          if [ "$backup" = "true" ]; then echo "::warning::Odpowiedział model zapasowy (Gemini niedostępne)"; fi
+          if [ "$took" -gt 30 ]; then echo "::warning::Analiza trwała ${took} s (limit z briefu: 30 s)"; fi
+          echo "| Sprawdzenie | Wynik |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Analiza | HTTP $code, ${took} s, $model (zapasowy: $backup) |" >> "$GITHUB_STEP_SUMMARY"
