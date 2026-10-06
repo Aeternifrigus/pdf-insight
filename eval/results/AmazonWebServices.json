@@ -1,0 +1,107 @@
+{
+  "document": {
+    "fileName": "AmazonWebServices.pdf",
+    "pages": 1,
+    "language": "en",
+    "type": "faktura",
+    "title": "Amazon Web Services Invoice",
+    "date": "2014-08-03"
+  },
+  "summary": "This document is an electronic invoice (number 42183017) issued on August 3, 2014, by Amazon Web Services, Inc. to iViveLabs Limited. The total amount due is $4.11 USD, covering the billing period from July 1 to July 31, 2014. The charges comprise AWS services including Amazon Elastic Compute Cloud, Amazon Glacier, AWS Data Transfer, and Amazon Simple Storage Service, with no taxes applied.",
+  "keyPoints": [
+    "Invoice number 42183017 issued on August 3, 2014, by Amazon Web Services, Inc.",
+    "Billed to iViveLabs Limited for the period July 1 – July 31, 2014.",
+    "Total amount due is $4.11 USD on August 3, 2014.",
+    "Charges include Amazon Glacier ($2.22), Amazon Elastic Compute Cloud ($1.87), AWS Data Transfer ($0.01), and Amazon Simple Storage Service ($0.01).",
+    "Total tax and VAT assessed on this invoice amount to $0.00."
+  ],
+  "entities": {
+    "organizations": [
+      "Amazon Web Services, Inc.",
+      "iViveLabs Limited"
+    ],
+    "people": []
+  },
+  "amounts": [
+    {
+      "value": 4.11,
+      "currency": "USD",
+      "context": "Total amount due on August 3, 2014 / Total for this invoice",
+      "foundInText": true
+    },
+    {
+      "value": 2.22,
+      "currency": "USD",
+      "context": "Amazon Glacier charges",
+      "foundInText": true
+    },
+    {
+      "value": 1.87,
+      "currency": "USD",
+      "context": "Amazon Elastic Compute Cloud charges",
+      "foundInText": true
+    },
+    {
+      "value": 0.01,
+      "currency": "USD",
+      "context": "AWS Data Transfer charges",
+      "foundInText": true
+    },
+    {
+      "value": 0.01,
+      "currency": "USD",
+      "context": "Amazon Simple Storage Service charges",
+      "foundInText": true
+    },
+    {
+      "value": 0,
+      "currency": "USD",
+      "context": "Credits",
+      "foundInText": true
+    },
+    {
+      "value": 0,
+      "currency": "USD",
+      "context": "Tax",
+      "foundInText": true
+    }
+  ],
+  "dates": [
+    {
+      "date": "2014-07-01",
+      "context": "Start of the billing period",
+      "foundInText": false,
+      "issue": "notInText"
+    },
+    {
+      "date": "2014-07-31",
+      "context": "End of the billing period",
+      "foundInText": true
+    },
+    {
+      "date": "2014-08-03",
+      "context": "Invoice date / Total amount due date",
+      "foundInText": true
+    }
+  ],
+  "keywords": [
+    "Amazon Web Services",
+    "invoice",
+    "iViveLabs Limited",
+    "Amazon Glacier",
+    "Amazon EC2",
+    "AWS",
+    "billing",
+    "cloud services"
+  ],
+  "analysis": {
+    "model": "gemini-3.8-flash",
+    "createdAt": "2026-10-06T03:06:17.343Z",
+    "chunks": 1,
+    "ocrPages": [],
+    "unreadPages": [],
+    "warnings": [
+      "Tych wartości nie znaleziono w tekście dokumentu, sprawdź je ręcznie: 2014-07-01."
+    ]
+  }
+}

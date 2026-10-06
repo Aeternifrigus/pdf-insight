@@ -1,0 +1,135 @@
+{
+  "document": {
+    "fileName": "coolblue2.pdf",
+    "pages": 1,
+    "language": "nl",
+    "type": "faktura",
+    "title": "FACTUUR",
+    "date": "2014-03-29"
+  },
+  "summary": "Dit is een factuur met nummer 992288600, uitgegeven op 29 maart 2014 door Coolblue B.V. aan Pino Bluebird voor ordernummer 12508334. Het totale factuurbedrag bedraagt € 4.904,94 inclusief btw (€ 4.053,67 exclusief btw en € 851,27 aan 21% btw). De betaling van € 4.904,94 heeft plaatsgevonden via iDEAL op 31 maart 2014.",
+  "keyPoints": [
+    "Factuurnummer 992288600 en ordernummer 12508334 van 29 maart 2014",
+    "Verkoper is Coolblue B.V., koper is Pino Bluebird",
+    "Totaalbedrag inclusief btw bedraagt € 4.904,94 (exclusief btw € 4.053,67, btw 21% € 851,27)",
+    "Betaald per iDEAL op 31 maart 2014",
+    "Factuur omvat IT-apparatuur en accessoires waaronder Apple MacBook Pro, MSI GS60 laptop, tassen en software"
+  ],
+  "entities": {
+    "organizations": [
+      "Coolblue B.V."
+    ],
+    "people": [
+      "Pino Bluebird"
+    ]
+  },
+  "amounts": [
+    {
+      "value": 4904.94,
+      "currency": "EUR",
+      "context": "Totaal incl. BTW",
+      "foundInText": true
+    },
+    {
+      "value": 4053.67,
+      "currency": "EUR",
+      "context": "Exclusief BTW",
+      "foundInText": true
+    },
+    {
+      "value": 851.27,
+      "currency": "EUR",
+      "context": "BTW 21%",
+      "foundInText": true
+    },
+    {
+      "value": 2321,
+      "currency": "EUR",
+      "context": "Apple MacBook Pro Retina 13,3'' + Apple Magic Mouse incl. BTW",
+      "foundInText": true
+    },
+    {
+      "value": 1999,
+      "currency": "EUR",
+      "context": "MSI GS60 2QE-226NL Ghost Pro incl. BTW",
+      "foundInText": true
+    },
+    {
+      "value": 199.98,
+      "currency": "EUR",
+      "context": "Decoded Leather Sleeve 15,4'' Vintage Bruin 2 stuks incl. BTW",
+      "foundInText": true
+    },
+    {
+      "value": 159.99,
+      "currency": "EUR",
+      "context": "HP USB 3.0 Port Replicator 3005pr incl. BTW",
+      "foundInText": true
+    },
+    {
+      "value": 124.99,
+      "currency": "EUR",
+      "context": "Microsoft Office Mac Home and Student 2011 NL PKC incl. BTW",
+      "foundInText": true
+    },
+    {
+      "value": 79.99,
+      "currency": "EUR",
+      "context": "Hex Outpost Origin Rugzak 15'' Grijs incl. BTW",
+      "foundInText": true
+    },
+    {
+      "value": 19.99,
+      "currency": "EUR",
+      "context": "Case-Mate Barely There Case Sony Xperia Z3 Transparant incl. BTW",
+      "foundInText": true
+    },
+    {
+      "value": 99.99,
+      "currency": "EUR",
+      "context": "Prijs per stuk Decoded Leather Sleeve",
+      "foundInText": true
+    },
+    {
+      "value": 3.5,
+      "currency": "EUR",
+      "context": "Thuiskopieheffing",
+      "foundInText": true
+    },
+    {
+      "value": 4.24,
+      "currency": "EUR",
+      "context": "Thuiskopieheffing incl. btw",
+      "foundInText": true
+    }
+  ],
+  "dates": [
+    {
+      "date": "2014-03-29",
+      "context": "Factuurdatum en orderdatum",
+      "foundInText": true
+    },
+    {
+      "date": "2014-03-31",
+      "context": "Betaling via iDEAL",
+      "foundInText": true
+    }
+  ],
+  "keywords": [
+    "Factuur",
+    "Coolblue",
+    "iDEAL",
+    "MacBook Pro",
+    "MSI GS60",
+    "BTW",
+    "laptop"
+  ],
+  "analysis": {
+    "model": "gemini-3.8-flash",
+    "createdAt": "2026-10-06T03:08:07.366Z",
+    "chunks": 1,
+    "ocrPages": [],
+    "unreadPages": [],
+    "warnings": []
+  }
+}

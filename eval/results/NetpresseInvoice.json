@@ -1,0 +1,113 @@
+{
+  "document": {
+    "fileName": "NetpresseInvoice.pdf",
+    "pages": 1,
+    "language": "fr",
+    "type": "faktura",
+    "title": "Facture n° 2022089083",
+    "date": "2022-11-28"
+  },
+  "summary": "Ce document est la facture n° 2022089083 émise le 28 novembre 2022 par la société NETPRESSE à destination d'ALEXINUX (Alexis de Lattre). Elle concerne une parution sur le-tout-lyon.fr prévue pour le 06 décembre 2022 ainsi qu'un justificatif PDF, pour le dossier n° 365146. Le montant total s'élève à 56,02 € TTC, comprenant un total hors taxes de 46,68 € et une TVA de 9,34 €. Le règlement peut être effectué par carte bancaire ou virement bancaire, les chèques n'étant plus acceptés.",
+  "keyPoints": [
+    "Facture n° 2022089083 émise le 28/11/2022 par NETPRESSE à ALEXINUX.",
+    "Montant total TTC de 56,02 € (Total HT de 46,68 €, TVA à 20% de 9,34 €).",
+    "Prestations : publication sur le-tout-lyon.fr (45,93 € HT) et justificatif PDF (0,75 € HT).",
+    "Date de parution prévue le 06/12/2022.",
+    "Indemnité forfaitaire de recouvrement de 40 € en cas de retard de paiement."
+  ],
+  "entities": {
+    "organizations": [
+      "ALEXINUX",
+      "NETPRESSE",
+      "BRED BANQUE POPULAIRE"
+    ],
+    "people": [
+      "Alexis de Lattre"
+    ]
+  },
+  "amounts": [
+    {
+      "value": 56.02,
+      "currency": "EUR",
+      "context": "Total TTC",
+      "foundInText": true
+    },
+    {
+      "value": 46.68,
+      "currency": "EUR",
+      "context": "Total HT",
+      "foundInText": true
+    },
+    {
+      "value": 9.34,
+      "currency": "EUR",
+      "context": "TVA 20%",
+      "foundInText": true
+    },
+    {
+      "value": 45.93,
+      "currency": "EUR",
+      "context": "Montant HT pour le-tout-lyon.fr du 06/12/2022",
+      "foundInText": true
+    },
+    {
+      "value": 40,
+      "currency": "EUR",
+      "context": "Indemnité forfaitaire de recouvrement",
+      "foundInText": true
+    },
+    {
+      "value": 0.75,
+      "currency": "EUR",
+      "context": "Montant HT justificatif PDF",
+      "foundInText": true
+    },
+    {
+      "value": 3.5,
+      "currency": "EUR",
+      "context": "Prix unitaire HT justificatif Papier",
+      "foundInText": true
+    },
+    {
+      "value": 0,
+      "currency": "EUR",
+      "context": "Montant HT justificatif Papier",
+      "foundInText": true
+    },
+    {
+      "value": 10000,
+      "currency": "EUR",
+      "context": "Capital social de NETPRESSE",
+      "foundInText": true
+    }
+  ],
+  "dates": [
+    {
+      "date": "2022-11-28",
+      "context": "Date de la facture",
+      "foundInText": true
+    },
+    {
+      "date": "2022-12-06",
+      "context": "Date de publication le-tout-lyon.fr",
+      "foundInText": true
+    }
+  ],
+  "keywords": [
+    "Facture",
+    "NETPRESSE",
+    "ALEXINUX",
+    "annonce légale",
+    "le-tout-lyon.fr",
+    "TVA",
+    "virement"
+  ],
+  "analysis": {
+    "model": "gemini-3.8-flash",
+    "createdAt": "2026-10-06T03:07:11.639Z",
+    "chunks": 1,
+    "ocrPages": [],
+    "unreadPages": [],
+    "warnings": []
+  }
+}

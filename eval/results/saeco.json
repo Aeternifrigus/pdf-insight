@@ -1,0 +1,80 @@
+{
+  "document": {
+    "fileName": "saeco.pdf",
+    "pages": 1,
+    "language": "nl",
+    "type": "faktura",
+    "title": "Kopie factuur",
+    "date": "2022-09-08"
+  },
+  "summary": "Dit is een kopie factuur met factuurnummer SCONL0303006280999, uitgegeven op 8 september 2022 aan Strategic Corp (t.a.v. bosd) gevestigd in Utrecht. De factuur betreft de levering van een onderhoudsset CA6707/10 en een SX Flyer SAECO Korting. Het totale factuurbedrag is EUR 49,99 inclusief BTW, dat volgens de administratie vooraf is betaald met een creditcard. De vervaldatum van de factuur is 22 september 2022.",
+  "keyPoints": [
+    "Factuurdatum is 8 september 2022 en de vervaldatum is 22 september 2022.",
+    "Koper is Strategic Corp gevestigd in Utrecht, Nederland.",
+    "Het totale factuurbedrag bedraagt EUR 49,99 inclusief 21% BTW.",
+    "De BTW bedraagt EUR 8,68 over een grondslag van EUR 41,31.",
+    "De factuur is vooraf voldaan via een creditcardbetaling."
+  ],
+  "entities": {
+    "organizations": [
+      "Strategic Corp"
+    ],
+    "people": [
+      "bosd"
+    ]
+  },
+  "amounts": [
+    {
+      "value": 49.99,
+      "currency": "EUR",
+      "context": "Factuur totaal inclusief BTW",
+      "foundInText": true
+    },
+    {
+      "value": 41.31,
+      "currency": "EUR",
+      "context": "Grondslag BTW (netto)",
+      "foundInText": true
+    },
+    {
+      "value": 8.68,
+      "currency": "EUR",
+      "context": "BTW bedrag (21%)",
+      "foundInText": true
+    },
+    {
+      "value": 49.99,
+      "currency": "EUR",
+      "context": "Prijs Onderhoudsset CA6707/10",
+      "foundInText": true
+    }
+  ],
+  "dates": [
+    {
+      "date": "2022-09-08",
+      "context": "Factuurdatum",
+      "foundInText": true
+    },
+    {
+      "date": "2022-09-22",
+      "context": "Vervaldatum",
+      "foundInText": true
+    }
+  ],
+  "keywords": [
+    "factuur",
+    "onderhoudsset",
+    "Utrecht",
+    "creditcard",
+    "BTW",
+    "kopie factuur"
+  ],
+  "analysis": {
+    "model": "gemini-3.5-flash",
+    "createdAt": "2026-10-06T03:08:45.100Z",
+    "chunks": 1,
+    "ocrPages": [],
+    "unreadPages": [],
+    "warnings": []
+  }
+}

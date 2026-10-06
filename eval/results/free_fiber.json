@@ -1,0 +1,85 @@
+{
+  "document": {
+    "fileName": "free_fiber.pdf",
+    "pages": 2,
+    "language": "fr",
+    "type": "faktura",
+    "title": "Facture n°562044387",
+    "date": "2015-07-02"
+  },
+  "summary": "Le document est une facture émise le 2 juillet 2015 par la société Free SAS pour l'abonné Alexis de Lattre. Le montant total à payer s'élève à 29,99 € TTC (dont 24,99 € HT et 5,00 € de TVA) au titre de l'abonnement Free Haut Débit pour la période du 1er au 31 juillet 2015. Le règlement est prévu par prélèvement automatique avec une date limite fixée au 5 juillet 2015.",
+  "keyPoints": [
+    "Facture n°562044387 émise par Free SAS le 2 juillet 2015 pour Alexis de Lattre.",
+    "Montant total à payer de 29,99 € TTC (24,99 € HT et 5,00 € de TVA).",
+    "Prestation facturée : abonnement Free Haut Débit pour juillet 2015.",
+    "Prélèvement automatique prévu à partir du 5 juillet 2015."
+  ],
+  "entities": {
+    "organizations": [
+      "Free SAS",
+      "Free Service Abonné"
+    ],
+    "people": [
+      "Alexis de Lattre"
+    ]
+  },
+  "amounts": [
+    {
+      "value": 29.99,
+      "currency": "EUR",
+      "context": "Somme totale à payer TTC / Montant du prélèvement",
+      "foundInText": true
+    },
+    {
+      "value": 24.99,
+      "currency": "EUR",
+      "context": "Montant total HT",
+      "foundInText": true
+    },
+    {
+      "value": 5,
+      "currency": "EUR",
+      "context": "Montant TVA 20%",
+      "foundInText": true
+    },
+    {
+      "value": 3441812,
+      "currency": "EUR",
+      "context": "Capital social de Free SAS",
+      "foundInText": false,
+      "issue": "notInText"
+    }
+  ],
+  "dates": [
+    {
+      "date": "2015-07-02",
+      "context": "Date d'émission de la facture",
+      "foundInText": true
+    },
+    {
+      "date": "2015-07-05",
+      "context": "Date limite de paiement / date de prélèvement automatique",
+      "foundInText": true
+    }
+  ],
+  "keywords": [
+    "Free SAS",
+    "facture",
+    "abonnement",
+    "Free Haut Débit",
+    "prélèvement automatique",
+    "TTC",
+    "HT",
+    "TVA"
+  ],
+  "analysis": {
+    "model": "gemini-3.8-flash",
+    "createdAt": "2026-10-06T03:08:19.360Z",
+    "chunks": 1,
+    "ocrPages": [],
+    "unreadPages": [],
+    "warnings": [
+      "Tych wartości nie znaleziono w tekście dokumentu, sprawdź je ręcznie: 3441812 EUR."
+    ]
+  }
+}

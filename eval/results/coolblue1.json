@@ -1,0 +1,144 @@
+{
+  "document": {
+    "fileName": "coolblue1.pdf",
+    "pages": 1,
+    "language": "nl",
+    "type": "faktura",
+    "title": "FACTUUR.",
+    "date": "2014-04-19"
+  },
+  "summary": "Dit document is een factuur met nummer 993548900 van Coolblue B.V. gericht aan Pino Bluebird, gedateerd op 19 april 2014. De factuur heeft betrekking op de levering van onder meer een Apple iPad Air, Nintendo 3DS XL en toebehoren naar aanleiding van ordernummer 12572103 van 18 april 2014. Het totale bedrag inclusief btw bedraagt € 717,97, waarvan € 593,36 exclusief btw en € 124,61 aan btw (21%). De betaling van het totale bedrag via iDEAL staat geregistreerd op 21 april 2015.",
+  "keyPoints": [
+    "Factuur 993548900 uitgegeven door Coolblue B.V. aan Pino Bluebird op 19 april 2014",
+    "Totaalbedrag incl. BTW is € 717,97 (exclusief BTW € 593,36, BTW 21% € 124,61)",
+    "Aankoop van o.a. Apple iPad Air (€ 399,00) en Nintendo 3DS XL (€ 189,00)",
+    "Ordernummer 12572103 gedateerd op 18 april 2014",
+    "Betaling via iDEAL van € 717,97 geregistreerd op 21 april 2015"
+  ],
+  "entities": {
+    "organizations": [
+      "Coolblue B.V."
+    ],
+    "people": [
+      "Pino Bluebird"
+    ]
+  },
+  "amounts": [
+    {
+      "value": 717.97,
+      "currency": "EUR",
+      "context": "Totaal inclusief BTW / Subtotaal",
+      "foundInText": true
+    },
+    {
+      "value": 593.36,
+      "currency": "EUR",
+      "context": "Exclusief BTW",
+      "foundInText": true
+    },
+    {
+      "value": 124.61,
+      "currency": "EUR",
+      "context": "BTW 21%",
+      "foundInText": true
+    },
+    {
+      "value": 399,
+      "currency": "EUR",
+      "context": "Apple iPad Air Wifi 16 GB Zilver",
+      "foundInText": true
+    },
+    {
+      "value": 189,
+      "currency": "EUR",
+      "context": "Nintendo 3DS XL Wit + Blauw",
+      "foundInText": true
+    },
+    {
+      "value": 69.99,
+      "currency": "EUR",
+      "context": "Decoded Leather Slim Cover Apple iPad Air 2 Zwart",
+      "foundInText": true
+    },
+    {
+      "value": 44.99,
+      "currency": "EUR",
+      "context": "Mario Kart 7 3DS",
+      "foundInText": true
+    },
+    {
+      "value": 14.99,
+      "currency": "EUR",
+      "context": "Nintendo AC-adapter",
+      "foundInText": true
+    },
+    {
+      "value": 4.24,
+      "currency": "EUR",
+      "context": "Incl. Thuiskopieheffing: Thuiskopie €3.50",
+      "foundInText": true
+    },
+    {
+      "value": 3.5,
+      "currency": "EUR",
+      "context": "Thuiskopie",
+      "foundInText": true
+    },
+    {
+      "value": 9.32,
+      "currency": "EUR",
+      "context": "Rembours op 25 mei 2015",
+      "foundInText": true
+    },
+    {
+      "value": -9.32,
+      "currency": "EUR",
+      "context": "Afschrijvingskosten op 31 mei 2015",
+      "foundInText": true
+    }
+  ],
+  "dates": [
+    {
+      "date": "2014-04-18",
+      "context": "Orderdatum",
+      "foundInText": true
+    },
+    {
+      "date": "2014-04-19",
+      "context": "Factuurdatum",
+      "foundInText": true
+    },
+    {
+      "date": "2015-04-21",
+      "context": "Betaling iDEAL",
+      "foundInText": true
+    },
+    {
+      "date": "2015-05-25",
+      "context": "Rembours",
+      "foundInText": true
+    },
+    {
+      "date": "2015-05-31",
+      "context": "Afschrijvingskosten",
+      "foundInText": true
+    }
+  ],
+  "keywords": [
+    "factuur",
+    "Coolblue",
+    "Apple iPad Air",
+    "Nintendo 3DS XL",
+    "BTW",
+    "iDEAL",
+    "order"
+  ],
+  "analysis": {
+    "model": "gemini-3.8-flash",
+    "createdAt": "2026-10-06T03:07:51.674Z",
+    "chunks": 1,
+    "ocrPages": [],
+    "unreadPages": [],
+    "warnings": []
+  }
+}

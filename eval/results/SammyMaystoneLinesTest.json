@@ -1,0 +1,100 @@
+{
+  "document": {
+    "fileName": "SammyMaystoneLinesTest.pdf",
+    "pages": 1,
+    "language": "en",
+    "type": "faktura",
+    "title": "INVOICE",
+    "date": "2022-01-01"
+  },
+  "summary": "This document is invoice number invoice_number_1 issued on January 1, 2022, by Sammy Maystone to Taylor Riddel. It covers services including repair (Service A) and cleaning (Service B) for a total balance due of $127.50. The payment terms are Net 30 days, with a due date of January 31, 2022. The total includes $0.00 tax on a subtotal of $127.50.",
+  "keyPoints": [
+    "Invoice # invoice_number_1 issued on January 1, 2022",
+    "Seller: Sammy Maystone; Buyer: Taylor Riddel (Ship To: Taylor's Store)",
+    "Total balance due is $127.50 (Subtotal: $127.50, Tax: $0.00)",
+    "Payment terms are Net 30 days, due by January 31, 2022",
+    "Items billed: Service A (Repair, $120.00) and Service B (Cleaning, $7.50)"
+  ],
+  "entities": {
+    "organizations": [
+      "Taylor's Store"
+    ],
+    "people": [
+      "Sammy Maystone",
+      "Taylor Riddel"
+    ]
+  },
+  "amounts": [
+    {
+      "value": 127.5,
+      "currency": "USD",
+      "context": "Total balance due",
+      "foundInText": true
+    },
+    {
+      "value": 127.5,
+      "currency": "USD",
+      "context": "Subtotal",
+      "foundInText": true
+    },
+    {
+      "value": 0,
+      "currency": "USD",
+      "context": "Tax (0%)",
+      "foundInText": true
+    },
+    {
+      "value": 120,
+      "currency": "USD",
+      "context": "Service A total amount",
+      "foundInText": true
+    },
+    {
+      "value": 10,
+      "currency": "USD",
+      "context": "Service A rate",
+      "foundInText": true
+    },
+    {
+      "value": 7.5,
+      "currency": "USD",
+      "context": "Service B total amount",
+      "foundInText": true
+    },
+    {
+      "value": 1.5,
+      "currency": "USD",
+      "context": "Service B rate",
+      "foundInText": true
+    }
+  ],
+  "dates": [
+    {
+      "date": "2022-01-01",
+      "context": "Invoice date",
+      "foundInText": true
+    },
+    {
+      "date": "2022-01-31",
+      "context": "Payment due date",
+      "foundInText": true
+    }
+  ],
+  "keywords": [
+    "Invoice",
+    "Repair",
+    "Cleaning",
+    "Sammy Maystone",
+    "Taylor Riddel",
+    "Balance Due",
+    "PO Number"
+  ],
+  "analysis": {
+    "model": "gemini-3.8-flash",
+    "createdAt": "2026-10-06T03:07:37.154Z",
+    "chunks": 1,
+    "ocrPages": [],
+    "unreadPages": [],
+    "warnings": []
+  }
+}

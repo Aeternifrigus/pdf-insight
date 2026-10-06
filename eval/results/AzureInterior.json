@@ -1,0 +1,102 @@
+{
+  "document": {
+    "fileName": "AzureInterior.pdf",
+    "pages": 1,
+    "language": "en",
+    "type": "faktura",
+    "title": "Invoice INV/2023/03/0008",
+    "date": "2023-03-20"
+  },
+  "summary": "Invoice INV/2023/03/0008 was issued on March 20, 2023, by Global Wholesaler (Azure Interior) to YourCompany (Mitchell Admin). The invoice covers non-food items like Beeswax and an Office Chair, as well as food products including Olive Oil and Luxury Truffles. The total amount due is $279.84, which includes a 15% tax of $16.94 on a taxable subtotal of $112.90. The payment is due by April 4, 2023, under a 15-day payment term.",
+  "keyPoints": [
+    "Invoice number INV/2023/03/0008 issued on 2023-03-20.",
+    "Total amount due is $279.84, with a subtotal of $262.90 and tax of $16.94.",
+    "Payment terms are 15 days, with a due date of 2023-04-04.",
+    "The seller is Global Wholesaler (Azure Interior) and the buyer is YourCompany (Mitchell Admin).",
+    "Incoterm specified is DPU - Delivered At Place Unloaded."
+  ],
+  "entities": {
+    "organizations": [
+      "Global Wholesaler",
+      "Azure Interior",
+      "YourCompany"
+    ],
+    "people": [
+      "Mitchell Admin"
+    ]
+  },
+  "amounts": [
+    {
+      "value": 279.84,
+      "currency": "USD",
+      "context": "Total gross amount due",
+      "foundInText": true
+    },
+    {
+      "value": 262.9,
+      "currency": "USD",
+      "context": "Subtotal before tax",
+      "foundInText": true
+    },
+    {
+      "value": 16.94,
+      "currency": "USD",
+      "context": "Tax 15% on $112.90",
+      "foundInText": true
+    },
+    {
+      "value": 42,
+      "currency": "USD",
+      "context": "Price of Beeswax XL",
+      "foundInText": true
+    },
+    {
+      "value": 70,
+      "currency": "USD",
+      "context": "Price of Office Chair",
+      "foundInText": true
+    },
+    {
+      "value": 0.9,
+      "currency": "USD",
+      "context": "Price of Olive Oil after discount",
+      "foundInText": true
+    },
+    {
+      "value": 150,
+      "currency": "USD",
+      "context": "Price of Luxury Truffles",
+      "foundInText": true
+    }
+  ],
+  "dates": [
+    {
+      "date": "2023-03-20",
+      "context": "Invoice Date",
+      "foundInText": true
+    },
+    {
+      "date": "2023-04-04",
+      "context": "Due Date",
+      "foundInText": true
+    }
+  ],
+  "keywords": [
+    "Invoice",
+    "Beeswax",
+    "Office Chair",
+    "Olive Oil",
+    "Luxury Truffles",
+    "Global Wholesaler",
+    "Azure Interior",
+    "DPU"
+  ],
+  "analysis": {
+    "model": "gemini-3.5-flash",
+    "createdAt": "2026-10-06T03:06:34.799Z",
+    "chunks": 1,
+    "ocrPages": [],
+    "unreadPages": [],
+    "warnings": []
+  }
+}

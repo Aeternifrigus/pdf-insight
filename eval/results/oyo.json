@@ -1,0 +1,83 @@
+{
+  "document": {
+    "fileName": "oyo.pdf",
+    "pages": 1,
+    "language": "en",
+    "type": "inne",
+    "title": "PAYMENT RECEIPT",
+    "date": "2017-12-31"
+  },
+  "summary": "This document is a payment receipt issued to guest Sanjay for a stay at OYO 4189 Resort Nanganallur in Chennai. The booking, with ID IBZY2087, was for 1 room for 1 night from December 31, 2017, to January 1, 2018. The total amount of Rs 1939 was paid in cash at the hotel. The payment was received by OYO on behalf of Oravel Stays Pvt. Ltd.",
+  "keyPoints": [
+    "Guest Sanjay stayed for 1 night at OYO 4189 Resort Nanganallur.",
+    "The check-in date was 2017-12-31 and check-out was 2018-01-01.",
+    "The total room charges amounted to Rs 1939, which was paid in full.",
+    "Payment was made via Cash at Hotel, leaving a balance of Rs 0.",
+    "The booking ID for this transaction is IBZY2087."
+  ],
+  "entities": {
+    "organizations": [
+      "OYO 4189 Resort Nanganallur",
+      "Oravel Stays Pvt. Ltd.",
+      "HDFC Bank",
+      "Oravel Stays Private Limited"
+    ],
+    "people": [
+      "Sanjay"
+    ]
+  },
+  "amounts": [
+    {
+      "value": 1939,
+      "currency": "INR",
+      "context": "Room Charges for 1 Night",
+      "foundInText": true
+    },
+    {
+      "value": 1939,
+      "currency": "INR",
+      "context": "Grand Total",
+      "foundInText": true
+    },
+    {
+      "value": 1939,
+      "currency": "INR",
+      "context": "Payment received by OYO through Cash At Hotel",
+      "foundInText": true
+    },
+    {
+      "value": 0,
+      "currency": "INR",
+      "context": "Balance",
+      "foundInText": true
+    }
+  ],
+  "dates": [
+    {
+      "date": "2017-12-31",
+      "context": "Receipt date and Check In date",
+      "foundInText": true
+    },
+    {
+      "date": "2018-01-01",
+      "context": "Check Out date",
+      "foundInText": true
+    }
+  ],
+  "keywords": [
+    "payment receipt",
+    "hotel booking",
+    "OYO",
+    "Oravel Stays",
+    "cash payment",
+    "Chennai"
+  ],
+  "analysis": {
+    "model": "gemini-3.5-flash",
+    "createdAt": "2026-10-06T03:08:34.816Z",
+    "chunks": 1,
+    "ocrPages": [],
+    "unreadPages": [],
+    "warnings": []
+  }
+}

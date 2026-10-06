@@ -1,0 +1,90 @@
+{
+  "document": {
+    "fileName": "QualityHosting.pdf",
+    "pages": 2,
+    "language": "de",
+    "type": "faktura",
+    "title": "Rechnung",
+    "date": "2014-05-07"
+  },
+  "summary": "Dokument to faktura o numerze 47774 wystawiona dnia 7 maja 2014 roku przez firmę QualityHosting AG dla klienta iViveLabs Ltd. z siedzibą w Hongkongu. Faktura dotyczy usług hostingowych i pocztowych (QualityExchange) świadczonych w okresie od 1 do 31 maja 2014 roku. Łączna kwota do zapłaty wynosi 34,73 EUR netto, a termin płatności przypada na 21 maja 2014 roku.",
+  "keyPoints": [
+    "Wystawca: QualityHosting AG, odbiorca: iViveLabs Ltd.",
+    "Numer faktury: 47774, numer klienta: 30064443",
+    "Suma do zapłaty: 34,73 EUR netto",
+    "Termin płatności: 21 maja 2014 roku (14 dni netto)",
+    "Okres świadczenia usług: od 1 maja 2014 do 31 maja 2014",
+    "Opłata za zwrot płatności (Rücklastschrift) z winy klienta wynosi 15,00 EUR"
+  ],
+  "entities": {
+    "organizations": [
+      "QualityHosting AG",
+      "iViveLabs Ltd.",
+      "Kreissparkasse Gelnhausen"
+    ],
+    "people": [
+      "Christian Heit",
+      "Markus Oestreicher",
+      "Hans Jürgen Habermann"
+    ]
+  },
+  "amounts": [
+    {
+      "value": 34.73,
+      "currency": "EUR",
+      "context": "Gesamtbetrag netto (Total EUR)",
+      "foundInText": true
+    },
+    {
+      "value": 5.39,
+      "currency": "EUR",
+      "context": "Grundgebühr pro Einheit für Small Business QualityExchange 2010",
+      "foundInText": true
+    },
+    {
+      "value": 3.89,
+      "currency": "EUR",
+      "context": "Grundgebühr pro Einheit für Small Business StandardExchange 2010",
+      "foundInText": true
+    },
+    {
+      "value": 15,
+      "currency": "EUR",
+      "context": "Entgelt für Rücklastschrift",
+      "foundInText": true
+    }
+  ],
+  "dates": [
+    {
+      "date": "2014-05-07",
+      "context": "Rechnungsdatum (data wystawienia faktury)",
+      "foundInText": true
+    },
+    {
+      "date": "2014-05-21",
+      "context": "Zahlungsziel (termin płatności)",
+      "foundInText": false,
+      "issue": "notInText"
+    }
+  ],
+  "keywords": [
+    "Rechnung",
+    "QualityHosting",
+    "iViveLabs",
+    "QualityExchange",
+    "StandardExchange",
+    "Gelnhausen",
+    "Hong Kong"
+  ],
+  "analysis": {
+    "model": "gemini-3.5-flash",
+    "createdAt": "2026-10-06T03:07:24.348Z",
+    "chunks": 1,
+    "ocrPages": [],
+    "unreadPages": [],
+    "warnings": [
+      "Podsumowanie lub najważniejsze punkty zawierają wartości, których nie znaleziono w tekście dokumentu: 2014-05-31, 2014-05-21, 2014-05-01.",
+      "Tych wartości nie znaleziono w tekście dokumentu, sprawdź je ręcznie: 2014-05-21."
+    ]
+  }
+}
