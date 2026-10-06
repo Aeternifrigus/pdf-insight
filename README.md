@@ -22,7 +22,7 @@ _Zrzuty pochodzą z testu przeglądarkowego z atrapą modelu („mock-model”);
 - **Kontrola halucynacji bez AI:** każda kwota, data, nazwa firmy i osoby oraz opis netto/brutto i okresu jest sprawdzany z tekstem dokumentu; skany są czytane niezależnie przez OCR w przeglądarce. Wynik jest oznaczany, nie cenzurowany.
 - **Bezpieczeństwo:** klucz tylko w sekretach Workera (zero kluczy w historii Git), CSP, treść PDF jako dane w bloku z losowym znacznikiem, heurystyka wykrywania poleceń dla AI, oznaczanie wartości pochodzących z takich poleceń.
 - **Niezawodność:** trzy modele Gemini, Groq i Workers AI, każdy z osobnym darmowym limitem; wynik od modelu zapasowego jest oznaczony. Monitoring co 6 godzin: [`.github/workflows/monitor.yml`](.github/workflows/monitor.yml).
-- **Testy:** 180 jednostkowych, 21 end-to-end w przeglądarce (CI przed każdym wdrożeniem), ewaluacja na prawdziwych dokumentach. Ograniczenia opisane wprost w sekcji „Znane ograniczenia”.
+- **Testy:** 187 jednostkowych, 21 end-to-end w przeglądarce (CI przed każdym wdrożeniem), ewaluacja na prawdziwych dokumentach. Ograniczenia opisane wprost w sekcji „Znane ograniczenia”.
 
 ## Co potrafi
 
@@ -165,11 +165,13 @@ OCR pobiera ok. 6,5 MB (rdzeń WASM i polski model `best_int`, serwowane z włas
 Umowa testowa to jeden dokument, a aplikacja była na nim strojona. Dlatego `eval/corpus/invoice2data/` zawiera 11 faktur z projektu open source [invoice2data](https://github.com/invoice-x/invoice2data) (licencja MIT, plik `LICENSE` obok): po angielsku, francusku, niemiecku i niderlandzku, z USA, Europy i Indii, każda z plikiem JSON z poprawnymi danymi (wystawca, kwota, kwota netto, data, numer, waluta).
 
 - **Offline, w `npm test`:** kontrole aplikacji potwierdzają prawdziwą kwotę i datę każdej faktury i oznaczają zmyśloną. Ten test od razu znalazł błąd: daty zapisane po francusku („02 Juillet 2015”), niderlandzku („29 maart 2014”), skrótem („Jan 1, 2022”) i bez zer („8-9-2022”) były zgłaszane jako „spoza dokumentu”. Poprawione.
+- **Wynik pierwszego przebiegu na żywo (Gemini):** 94% sprawdzeń zgodnych ze wzorcem, wszystkie kwoty do zapłaty, waluty, kwoty netto i daty faktur poprawne, mediana 7,3 s na fakturę. Braki mają znane przyczyny: wystawcy „e-Luscious Nederland B.V.” nie ma w warstwie tekstowej (tylko w logo), więc model słusznie go nie podał; dokument „oyo” to potwierdzenie płatności („PAYMENT RECEIPT”), a nie faktura; numer faktury nie ma pola w schemacie z briefu, więc liczy się tylko, gdy model wpisze go do podsumowania.
+- **Precyzja kontroli aplikacji:** w tym przebiegu kontrole oznaczyły 4 pozycje i wszystkie 4 były fałszywymi alarmami (model miał rację): komórki tabeli sklejone spacją („1 278.61” to ilość 1 i cena 278.61), kropki jako separator tysięcy w dokumencie z kropką dziesiętną („3.441.812 Euros”), rok dwucyfrowy („21.05.14”) i początek zakresu ze wspólnym rokiem („July 1 - July 31, 2014”). Wszystkie poprawione i pilnowane testem regresji; kontrole na umowie testowej (wstrzyknięte „1 PLN”, kwoty w złej walucie) nadal działają. Zapisane wyniki można ocenić ponownie bez nowych zapytań: `RESCORE=1 npm run eval:invoices`.
 - **Na żywym API:** `LIVE_API=https://pdf-insight-api.<konto>.workers.dev npm run eval:invoices` wysyła każdą fakturę do wdrożonego backendu (z odstępem 7 s ze względu na limit), przepuszcza wynik przez te same kontrole co przeglądarka i porównuje ze wzorcem. Raport: `eval/results/invoices.md`, wyniki: `eval/results/*.json`.
 
 ### Pomiar demo z zewnątrz
 
-`npm run live:check -- /ścieżka/umowa.pdf` (po jednorazowym `npx playwright install chromium`) otwiera wdrożone demo w nowej przeglądarce bez pamięci podręcznej, wgrywa plik i mierzy czas do podsumowania na zwykłym łączu oraz na symulowanym wolnym internecie mobilnym (1,6 Mb/s, 150 ms, procesor 4× wolniejszy). Zapisuje raport `eval/results/live-timing.md`, wynik do sprawdzarki faktów i zrzuty ekranu do README.
+`npm run live:check -- /ścieżka/umowa.pdf` (po jednorazowym `npx playwright install chromium`) otwiera wdrożone demo w nowej przeglądarce bez pamięci podręcznej, wgrywa plik i mierzy czas do podsumowania na zwykłym łączu oraz na symulowanym wolnym internecie mobilnym (1,6 Mb/s, 150 ms, procesor 4× wolniejszy). Zapisuje raport `eval/results/live-timing.md`, wynik do sprawdzarki faktów i zrzuty ekranu do README. Pierwszy pomiar (listy do 30 kwot i 30 dat): 26,7 s na zwykłym łączu i 29,9 s na wolnym mobilnym, czyli tuż pod limitem 30 s. Czas rośnie z długością odpowiedzi modelu, więc listy ograniczono do 15 pozycji w kolejności ważności (odpadają pojedyncze pozycje cenników, nie fakty wymagane); aktualny wynik pomiaru jest w raporcie.
 
 ### Sprawdzarka faktów
 
