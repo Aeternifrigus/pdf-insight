@@ -134,6 +134,24 @@ Każdy punkt sprawdzony w kodzie, w historii Git i w zbudowanej aplikacji (nie t
 
 ## Kontrola jakości wyników AI
 
+### Ochrona przed halucynacjami w aplikacji (bez AI)
+
+Model AI może zmyślić wartość albo nazwę. Każdy wynik przechodzi w przeglądarce kontrole deterministyczne, które niczego nie usuwają, tylko oznaczają pozycje i dodają ostrzeżenia w „Rzeczach do sprawdzenia”:
+
+| Co jest sprawdzane                     | Jak                                                                                                                               | Co widzi użytkownik                                                                                                |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Kwoty i daty z list                    | wartość (z walutą) musi wystąpić w tekście dokumentu, z uwzględnieniem polskiego i angielskiego zapisu liczb                      | `foundInText: true/false`, przy `false` powód: brak w tekście, inna waluta albo wartość tylko z ukrytego polecenia |
+| Kwoty i daty w podsumowaniu i punktach | to samo dla wartości zapisanych w tekście                                                                                         | ostrzeżenie z listą wartości                                                                                       |
+| Wartości ze zeskanowanych stron        | **OCR (Tesseract) w przeglądarce** czyta skany niezależnie od AI, równolegle z analizą; jego tekst służy jako drugi dowód         | wartość ze skanu potwierdzona albo oznaczona; `analysis.ocrVerifiedPages`                                          |
+| Osoby i firmy                          | każde słowo nazwy musi wystąpić w dokumencie, z tolerancją polskiej odmiany („Anna Kowalczyk” / „Annę Kowalczyk”) i form prawnych | ostrzeżenie z listą nazw                                                                                           |
+| Wyniki modelu zapasowego               | znacznik `analysis.backup`                                                                                                        | ostrzeżenie i brak ponownego użycia z historii                                                                     |
+
+Sprawdzone na umowie testowej z zmyślonymi wartościami w odpowiedzi: OCR potwierdził 13 100 PLN, 1.04.2027 i 20.03.2026 z aneksu (wcześniej „nie da się sprawdzić”), a wymyślone 14 200 PLN, 2027-05-15 i firma „Globex Polska” zostały oznaczone. Nie da się tak sprawdzić znaczenia zdań (np. czy kwota jest dobrze opisana), tylko obecność wartości i nazw.
+
+OCR pobiera ok. 6,5 MB (rdzeń WASM i polski model `best_int`, serwowane z własnej domeny, bez CDN) tylko wtedy, gdy dokument ma skany. Jeśli nie zdąży (limit 3 s po odpowiedzi AI) albo się nie uda, wartości ze skanów zostają oznaczone jako niesprawdzone, jak wcześniej.
+
+### Sprawdzarka faktów
+
 Jakość wyników to 20% oceny, a model można sprawdzić tylko na prawdziwym dokumencie. Katalog `eval/` zawiera:
 
 - `eval/facts.ts`: wzorzec faktów umowy testowej, odczytany ręcznie ze wszystkich 12 stron (także ze skanu aneksu): wymagane i oczekiwane kwoty z walutą, daty, podmioty, osoby oraz pełny spis wszystkich kwot i dat w dokumencie;
