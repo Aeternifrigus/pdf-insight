@@ -165,6 +165,8 @@ FACTS_JSON=~/Downloads/Test_PDF_Insight_umowa_14-2026.insight.json npm run check
 TEST_PDF=~/Downloads/Test_PDF_Insight_umowa_14-2026.pdf npm run check:facts
 ```
 
+**Wynik prawdziwego modelu (Gemini, demo, umowa testowa):** 28 z 28 faktów obowiązkowych (w tym kwota brutto, kwoty w EUR i USD oraz obie zmiany z zeskanowanego aneksu: abonament 13 100 PLN od 1.04.2027 i 120 → 135 użytkowników), 9 z 17 uzupełniających, zero wartości, firm i osób spoza dokumentu, ukryte polecenie ze strony 4 zignorowane i zgłoszone, kontrola wartości w aplikacji bez fałszywych alarmów. Brakujące fakty uzupełniające to szczegóły z najniższego poziomu ważności (np. data kick-offu, stawka godzinowa, kwota VAT).
+
 Bez tych zmiennych testy z `eval/` są pomijane. Wynik atrapy modelu użytej do zrzutów ekranu przechodzi 25 z 28 sprawdzeń obowiązkowych (brakuje dat początku i końca umowy oraz daty zmiany abonamentu z aneksu), co jest zapisane w `eval/factCheck.test.ts`.
 
 ## Uruchomienie lokalne
