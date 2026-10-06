@@ -53,9 +53,10 @@ function openAiClient(env: Env, fetchFn: FetchFn): LlmClient {
   return new OpenAiCompatibleClient(
     env.OPENAI_API_KEY,
     (env.OPENAI_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/+$/, ''),
-    env.OPENAI_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct',
+    env.OPENAI_MODEL || 'qwen/qwen3.8-27b',
     fetchFn,
     Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : 8_192,
+    env.OPENAI_REASONING_FORMAT || undefined,
   );
 }
 
@@ -298,6 +299,11 @@ class OpenAiCompatibleClient implements LlmClient {
     private readonly fetchFn: FetchFn,
     /** Górny limit modelu (np. Groq: 8192); większa wartość kończy się błędem 400. */
     private readonly maxTokensCap = 8_192,
+    /**
+     * Groq: modele z „myśleniem” (np. Qwen) bez "hidden" dopisują rozumowanie do treści
+     * odpowiedzi, co psuje JSON. Inni dostawcy tego pola nie znają, więc jest opcjonalne.
+     */
+    private readonly reasoningFormat?: string,
   ) {}
 
   async complete(system: string, turns: Turn[], options: CallOptions = {}): Promise<string> {
@@ -332,6 +338,7 @@ class OpenAiCompatibleClient implements LlmClient {
           this.maxTokensCap,
         ),
         response_format: { type: 'json_object' },
+        ...(this.reasoningFormat ? { reasoning_format: this.reasoningFormat } : {}),
       },
       options.timeoutMs,
     )) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };

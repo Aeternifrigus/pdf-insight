@@ -423,6 +423,23 @@ describe('zapasowy dostawca (Groq)', () => {
     const result = await analyzeDocument(request, createLlm(env, fetchFn));
     expect(result.analysis.model).toBe('backup-model');
     expect(JSON.parse(groqBody)).toMatchObject({ model: 'backup-model', max_tokens: 8192 });
+    expect(JSON.parse(groqBody)).not.toHaveProperty('reasoning_format');
+  });
+
+  it('wysyła reasoning_format tylko, gdy jest skonfigurowany (Groq, modele z myśleniem)', async () => {
+    let groqBody = '';
+    const fetchFn = ((u: string, init: RequestInit) => {
+      if (u.includes('generativelanguage')) {
+        return Promise.resolve(new Response('{"error":{"code":503}}', { status: 503 }));
+      }
+      groqBody = typeof init.body === 'string' ? init.body : '';
+      return Promise.resolve(groqOk());
+    }) as typeof fetch;
+    await analyzeDocument(
+      request,
+      createLlm({ ...env, OPENAI_REASONING_FORMAT: 'hidden' }, fetchFn),
+    );
+    expect(JSON.parse(groqBody)).toMatchObject({ reasoning_format: 'hidden' });
   });
 
   it('odmowa filtra treści Gemini nie jest obchodzona innym dostawcą', async () => {

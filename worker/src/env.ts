@@ -13,6 +13,8 @@ export interface Env {
   OPENAI_MODEL?: string;
   /** Limit max_tokens dostawcy zgodnego z OpenAI (Groq: 8192). */
   OPENAI_MAX_TOKENS?: string;
+  /** Groq: "hidden" usuwa rozumowanie modelu z treści odpowiedzi (inaczej JSON jest zepsuty). */
+  OPENAI_REASONING_FORMAT?: string;
   /** Lista dozwolonych originów oddzielona przecinkami. */
   ALLOWED_ORIGINS?: string;
   /** Opcjonalny binding Cloudflare Rate Limiting (patrz wrangler.toml). */
