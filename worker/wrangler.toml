@@ -12,15 +12,24 @@ GEMINI_MODEL = "gemini-3.8-flash"
 # modeli; każdy ma osobny limit darmowy. Wszystkie obsługują obrazy (odczyt skanów).
 GEMINI_FALLBACK_MODELS = "gemini-3.5-flash,gemini-3.5-flash-lite"
 # Zapasowy dostawca z osobnym darmowym limitem (Groq, API zgodne z OpenAI). Qwen na Groq czyta
-# obrazy (sprawdzone zapytaniem z obrazem) i zwraca czysty JSON przy reasoning_format "hidden".
+# obrazy (sprawdzone zapytaniem z obrazem) i zwraca czysty JSON przy wyłączonym rozumowaniu.
 # Włącza się dopiero po dodaniu sekretu: wrangler secret put OPENAI_API_KEY --config worker/wrangler.toml
 OPENAI_BASE_URL = "https://api.groq.com/openai/v1"
 OPENAI_MODEL = "qwen/qwen3.8-27b"
-OPENAI_REASONING_FORMAT = "hidden"
-OPENAI_MAX_TOKENS = "8192"
+# Bez rozumowania cały limit idzie na odpowiedź. Darmowy Groq liczy do limitu 8000 tokenów
+# na minutę prompt RAZEM z max_tokens, więc 8192 odrzucałoby każde żądanie.
+OPENAI_REASONING_EFFORT = "none"
+OPENAI_MAX_TOKENS = "3000"
+# Trzeci dostawca: Cloudflare Workers AI przez binding (bez klucza, dzienny darmowy przydział).
+# Mieści całą umowę testową z obrazami, czego Groq przy 8000 tokenów/min nie zrobi.
+WORKERS_AI_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct"
+WORKERS_AI_MAX_TOKENS = "8192"
 # Origin GitHub Pages to sama domena, bez ścieżki repozytorium.
 # Localhost NIE jest dopuszczony w produkcji; lokalnie nadpisuje to worker/.dev.vars.
 ALLOWED_ORIGINS = "https://aeternifrigus.github.io"
+
+[ai]
+binding = "AI"
 
 # Limit żądań współdzielony między instancjami workera (10 analiz / 60 s na adres IP).
 [[ratelimits]]

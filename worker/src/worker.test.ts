@@ -15,6 +15,7 @@ import {
   createLlm,
   DEFAULT_GEMINI_MODEL,
   geminiModels,
+  workersAiError,
   parseRetryAfter,
   thinkingConfigFor,
   type LlmClient,
@@ -426,7 +427,7 @@ describe('zapasowy dostawca (Groq)', () => {
     expect(JSON.parse(groqBody)).not.toHaveProperty('reasoning_format');
   });
 
-  it('wysyła reasoning_format tylko, gdy jest skonfigurowany (Groq, modele z myśleniem)', async () => {
+  it('wysyła ustawienia rozumowania tylko, gdy są skonfigurowane (Groq, modele z myśleniem)', async () => {
     let groqBody = '';
     const fetchFn = ((u: string, init: RequestInit) => {
       if (u.includes('generativelanguage')) {
@@ -467,6 +468,70 @@ describe('zapasowy dostawca (Groq)', () => {
       )) as typeof fetch;
     const err = await analyzeDocument(request, createLlm(env, fetchFn)).catch((e: unknown) => e);
     expect(err).toMatchObject({ code: 'AI_UNAVAILABLE' });
+  });
+});
+
+describe('Cloudflare Workers AI (trzeci dostawca)', () => {
+  const overloaded = () => new Response('{"error":{"code":503}}', { status: 503 });
+  const fakeAi = (impl: (model: string, inputs: Record<string, unknown>) => Promise<unknown>) => {
+    const calls: { model: string; inputs: Record<string, unknown> }[] = [];
+    return {
+      calls,
+      AI: {
+        run: (model: string, inputs: Record<string, unknown>) => {
+          calls.push({ model, inputs });
+          return impl(model, inputs);
+        },
+      },
+    };
+  };
+  const base = { GEMINI_API_KEY: 'g', GEMINI_MODEL: 'main', WORKERS_AI_MODEL: '@cf/test/model' };
+
+  it('gdy Gemini i Groq zawodzą, odpowiada Workers AI (także gdy zwraca gotowy obiekt JSON)', async () => {
+    const ai = fakeAi(() => Promise.resolve({ response: JSON.parse(good) as unknown }));
+    const fetchFn = ((u: string) =>
+      Promise.resolve(
+        u.includes('groq')
+          ? new Response('{"error":{"message":"Request too large"}}', { status: 413 })
+          : overloaded(),
+      )) as typeof fetch;
+    const llm = createLlm({ ...base, OPENAI_API_KEY: 'q', AI: ai.AI }, fetchFn);
+    const result = await analyzeDocument(request, llm);
+    expect(result.analysis.model).toBe('@cf/test/model');
+    expect(ai.calls[0]?.inputs).toMatchObject({
+      max_tokens: 8192,
+      response_format: { type: 'json_object' },
+    });
+  });
+
+  it('obrazy stron trafiają do Workers AI jako data URL', async () => {
+    const ai = fakeAi(() => Promise.resolve({ response: good }));
+    const llm = createLlm({ ...base, LLM_PROVIDER: 'workers-ai', AI: ai.AI });
+    await analyzeDocument(
+      {
+        ...request,
+        pageCount: 3,
+        pages: [...request.pages, { page: 3, text: '' }],
+        images: [{ page: 3, mimeType: 'image/jpeg', data: 'AAAA' }],
+      },
+      llm,
+    );
+    expect(JSON.stringify(ai.calls[0]?.inputs)).toContain('data:image/jpeg;base64,AAAA');
+  });
+
+  it('bez WORKERS_AI_MODEL binding nie jest używany', async () => {
+    const ai = fakeAi(() => Promise.resolve({ response: good }));
+    const llm = createLlm({ GEMINI_API_KEY: 'g', AI: ai.AI }, () => Promise.resolve(overloaded()));
+    await analyzeDocument(request, llm).catch(() => undefined);
+    expect(ai.calls).toHaveLength(0);
+  });
+
+  it('zamienia błędy bindingu na kody, które rozumie łańcuch dostawców', () => {
+    expect(workersAiError(new Error('3036: daily free allocation of neurons used'))).toMatchObject({
+      status: 429,
+    });
+    expect(workersAiError(new Error('5007: No such model'))).toMatchObject({ status: 404 });
+    expect(workersAiError(new Error('something broke'))).toMatchObject({ status: 503 });
   });
 });
 

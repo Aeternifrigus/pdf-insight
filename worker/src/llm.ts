@@ -40,11 +40,28 @@ export function createLlm(env: Env, fetchFn: FetchFn = fetch): LlmClient {
       geminiModels(env.GEMINI_MODEL, env.GEMINI_FALLBACK_MODELS),
       fetchFn,
     );
-    // Drugi, niezależny dostawca z osobnym darmowym limitem: włączany samą obecnością klucza.
-    return env.OPENAI_API_KEY ? new ChainClient([gemini, openAiClient(env, fetchFn)]) : gemini;
+    // Zapasowi dostawcy z osobnymi darmowymi limitami, włączani samą konfiguracją:
+    // Groq (sekret OPENAI_API_KEY) i Cloudflare Workers AI (binding AI w wrangler.toml).
+    const backups: LlmClient[] = [];
+    if (env.OPENAI_API_KEY) backups.push(openAiClient(env, fetchFn));
+    if (env.AI && env.WORKERS_AI_MODEL) backups.push(workersAiClient(env));
+    return backups.length > 0 ? new ChainClient([gemini, ...backups]) : gemini;
   }
   if (provider === 'openai') return openAiClient(env, fetchFn);
+  if (provider === 'workers-ai') return workersAiClient(env);
   throw new AppError('MISCONFIGURED', 500, 'Serwer ma nieprawidłową konfigurację dostawcy AI.');
+}
+
+function workersAiClient(env: Env): LlmClient {
+  if (!env.AI) {
+    throw new AppError('MISCONFIGURED', 500, 'Serwer nie ma bindingu Workers AI (AI).');
+  }
+  const maxTokens = Number(env.WORKERS_AI_MAX_TOKENS);
+  return new WorkersAiClient(
+    env.AI,
+    env.WORKERS_AI_MODEL || '@cf/meta/llama-4-scout-17b-16e-instruct',
+    Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : 8_192,
+  );
 }
 
 function openAiClient(env: Env, fetchFn: FetchFn): LlmClient {
@@ -56,7 +73,10 @@ function openAiClient(env: Env, fetchFn: FetchFn): LlmClient {
     env.OPENAI_MODEL || 'qwen/qwen3.8-27b',
     fetchFn,
     Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : 8_192,
-    env.OPENAI_REASONING_FORMAT || undefined,
+    {
+      reasoning_format: env.OPENAI_REASONING_FORMAT || undefined,
+      reasoning_effort: env.OPENAI_REASONING_EFFORT || undefined,
+    },
   );
 }
 
@@ -156,7 +176,7 @@ const MIN_FALLBACK_MS = 5_000;
  */
 const PER_MODEL_MS = 25_000;
 /** Czas zostawiany zapasowemu dostawcy w łańcuchu (ChainClient). */
-const BACKUP_RESERVE_MS = 15_000;
+const BACKUP_RESERVE_MS = 20_000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 12_288;
 
 /**
@@ -300,10 +320,11 @@ class OpenAiCompatibleClient implements LlmClient {
     /** Górny limit modelu (np. Groq: 8192); większa wartość kończy się błędem 400. */
     private readonly maxTokensCap = 8_192,
     /**
-     * Groq: modele z „myśleniem” (np. Qwen) bez "hidden" dopisują rozumowanie do treści
-     * odpowiedzi, co psuje JSON. Inni dostawcy tego pola nie znają, więc jest opcjonalne.
+     * Groq, modele z „myśleniem” (np. Qwen): reasoning_effort "none" wyłącza rozumowanie
+     * (cały limit tokenów idzie na odpowiedź), reasoning_format "hidden" usuwa je z treści.
+     * Inni dostawcy tych pól nie znają, więc są wysyłane tylko, gdy są skonfigurowane.
      */
-    private readonly reasoningFormat?: string,
+    private readonly reasoning: { reasoning_format?: string; reasoning_effort?: string } = {},
   ) {}
 
   async complete(system: string, turns: Turn[], options: CallOptions = {}): Promise<string> {
@@ -338,7 +359,7 @@ class OpenAiCompatibleClient implements LlmClient {
           this.maxTokensCap,
         ),
         response_format: { type: 'json_object' },
-        ...(this.reasoningFormat ? { reasoning_format: this.reasoningFormat } : {}),
+        ...Object.fromEntries(Object.entries(this.reasoning).filter(([, v]) => v)),
       },
       options.timeoutMs,
     )) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
@@ -408,4 +429,85 @@ export class ChainClient implements LlmClient {
     this.start = 0;
     for (const c of this.clients) c.reset?.();
   }
+}
+
+/** Minimalny interfejs bindingu Workers AI (env.AI) potrzebny klientowi. */
+export interface WorkersAiBinding {
+  run(model: string, inputs: Record<string, unknown>): Promise<unknown>;
+}
+
+/**
+ * Cloudflare Workers AI przez binding: bez klucza API, z dziennym darmowym przydziałem
+ * („neurony”) na koncie Cloudflare. Model z obsługą obrazów i długim kontekstem, więc
+ * w odróżnieniu od Groq (8000 tokenów na minutę) mieści całą umowę testową.
+ */
+class WorkersAiClient implements LlmClient {
+  constructor(
+    private readonly ai: WorkersAiBinding,
+    readonly model: string,
+    private readonly maxTokensCap: number,
+  ) {}
+
+  async complete(system: string, turns: Turn[], options: CallOptions = {}): Promise<string> {
+    const messages = [
+      { role: 'system', content: system },
+      ...turns.map((t) => {
+        const role = t.role === 'model' ? 'assistant' : 'user';
+        if (!t.images?.length) return { role, content: t.text };
+        return {
+          role,
+          content: [
+            { type: 'text', text: t.text },
+            ...t.images.map((img) => ({
+              type: 'image_url',
+              image_url: { url: `data:${img.mimeType};base64,${img.data}` },
+            })),
+          ],
+        };
+      }),
+    ];
+    const timeoutMs = Math.max(1, Math.min(options.timeoutMs ?? CALL_TIMEOUT_MS, CALL_TIMEOUT_MS));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new ProviderError(504, 'Brak odpowiedzi Workers AI: TimeoutError'));
+      }, timeoutMs);
+    });
+    let out: unknown;
+    try {
+      out = await Promise.race([
+        this.ai.run(this.model, {
+          messages,
+          max_tokens: Math.min(
+            options.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+            this.maxTokensCap,
+          ),
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+        }),
+        timeout,
+      ]);
+    } catch (e) {
+      throw workersAiError(e);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
+    const response = (out as { response?: unknown } | null)?.response;
+    // W trybie JSON Workers AI potrafi zwrócić od razu obiekt zamiast tekstu.
+    if (response && typeof response === 'object') return JSON.stringify(response);
+    return typeof response === 'string' ? response : '';
+  }
+}
+
+/** Błędy bindingu to zwykłe wyjątki z kodem w treści; zamieniamy je na kody HTTP łańcucha. */
+export function workersAiError(e: unknown): ProviderError {
+  if (e instanceof ProviderError) return e;
+  const message = e instanceof Error ? e.message : String(e);
+  const detail = `Workers AI: ${message.slice(0, 300)}`;
+  if (/neuron|daily|allocation|rate limit|too many|capacity|3036|3040/i.test(message)) {
+    return new ProviderError(429, detail);
+  }
+  if (/no such model|not found|5007/i.test(message)) return new ProviderError(404, detail);
+  if (/timeout|timed out/i.test(message)) return new ProviderError(504, detail);
+  return new ProviderError(503, detail);
 }

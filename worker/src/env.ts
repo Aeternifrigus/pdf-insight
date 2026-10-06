@@ -1,7 +1,9 @@
 export interface Env {
   /**
    * "gemini" (domyślnie) lub "openai" (dowolne API zgodne z OpenAI, np. Groq).
-   * Przy "gemini" ustawiony OPENAI_API_KEY włącza drugiego dostawcę jako zapasowego.
+   * "workers-ai" używa wyłącznie Cloudflare Workers AI (przydatne do testu).
+   * Przy "gemini" ustawiony OPENAI_API_KEY (Groq) oraz binding AI z WORKERS_AI_MODEL
+   * włączają zapasowych dostawców w tej kolejności.
    */
   LLM_PROVIDER?: string;
   GEMINI_API_KEY?: string;
@@ -15,6 +17,13 @@ export interface Env {
   OPENAI_MAX_TOKENS?: string;
   /** Groq: "hidden" usuwa rozumowanie modelu z treści odpowiedzi (inaczej JSON jest zepsuty). */
   OPENAI_REASONING_FORMAT?: string;
+  /** Groq: "none" wyłącza rozumowanie modelu, cały limit tokenów idzie na odpowiedź. */
+  OPENAI_REASONING_EFFORT?: string;
+  /** Binding Cloudflare Workers AI ([ai] w wrangler.toml); bez klucza API. */
+  AI?: { run(model: string, inputs: Record<string, unknown>): Promise<unknown> };
+  /** Model Workers AI; jego ustawienie razem z bindingiem włącza Workers AI jako zapasowego. */
+  WORKERS_AI_MODEL?: string;
+  WORKERS_AI_MAX_TOKENS?: string;
   /** Lista dozwolonych originów oddzielona przecinkami. */
   ALLOWED_ORIGINS?: string;
   /** Opcjonalny binding Cloudflare Rate Limiting (patrz wrangler.toml). */
