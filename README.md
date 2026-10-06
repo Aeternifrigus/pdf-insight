@@ -4,7 +4,7 @@ Aplikacja webowa, która wczytuje plik PDF, tworzy jego krótkie podsumowanie i 
 
 **Demo:** https://aeternifrigus.github.io/pdf-insight/
 
-**Autor:** [Aeternifrigus](https://github.com/Aeternifrigus)
+**Autor:** [Aeternifrigus](https://aeternifrigus.netlify.app/) ([GitHub](https://github.com/Aeternifrigus))
 
 ![Zrzut ekranu: wynik analizy umowy testowej](docs/screenshot.png)
 
@@ -88,6 +88,7 @@ worker/src/     backend: router HTTP, CORS, limity, prompty, klient LLM, analiza
 - **Długie dokumenty: map-reduce.** Tekst dzielony jest po granicach stron na fragmenty do 150 tys. znaków (ok. 40 tys. tokenów, model ma okno 1 mln), więc nawet dokument z limitem to maks. 3 fragmenty i 1 wywołanie łączące, co mieści się w darmowym limicie zapytań. Fragmenty są analizowane maks. po 2 równolegle, listy są łączone deterministycznie z usunięciem duplikatów, a podsumowanie całości powstaje w osobnym, krótkim wywołaniu.
 - **Brak routingu.** Aplikacja ma jeden widok, więc nie ma problemu odświeżania podstron na GitHub Pages (nie są potrzebne HashRouter ani `404.html`). `base` w Vite ustawiany jest w CI z nazwy repozytorium, a worker pdf.js importowany jest przez `?url`, więc działa pod ścieżką `/<repo>/`.
 - **pdf.js ładowany leniwie** przy pierwszym pliku, żeby pierwsze wyświetlenie strony było szybkie.
+- **pdf.js w wersji „legacy”.** pdf.js 6 używa nowych funkcji JavaScript (np. `Math.sumPrecise`), których nie mają przeglądarki sprzed 2026 r. (Chrome przed 147, starsze Safari). W nich każda strona kończyła się wyjątkiem i użytkownik widział mylące „W pliku nie ma tekstu”. Wersja legacy zawiera polyfille (ok. 5% większy worker). Gdy mimo to nie da się odczytać żadnej strony, komunikat mówi o problemie przeglądarki, a nie o braku tekstu.
 
 ### Bezpieczeństwo
 
