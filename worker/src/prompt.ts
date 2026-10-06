@@ -37,6 +37,11 @@ const SECURITY_RULES = `SECURITY (highest priority):
  * i mógł pominąć np. okres obowiązywania umowy. Priorytety są wspólne dla analizy, łączenia
  * części długiego dokumentu i ponownej próby po uciętej odpowiedzi.
  */
+/**
+ * Limit 15 kwot i 15 dat (wcześniej 30): czas odpowiedzi rośnie z jej długością, a pomiar demo
+ * z zewnątrz dał 26,7 s przy limicie 30 s z briefu. Kolejność według ważności sprawia, że
+ * odpadają szczegóły z najniższego poziomu (pojedyncze pozycje cennika), nie fakty wymagane.
+ */
 export const IMPORTANCE_RULES = `IMPORTANCE (use this order for the summary, keyPoints, amounts and dates; when a list must be shortened, drop items from the bottom of the order first):
 1. Identity: what the document is (type, number, title), the parties and their roles, the date it was signed or issued.
 2. Money that defines the deal: the total or main value, the main recurring fees with their period, net and gross when both are written, in the original currency.
@@ -58,8 +63,8 @@ const EXTRACTION_RULES = `RULES:
 - summary: 3 to 5 complete sentences covering levels 1 to 4 of IMPORTANCE: what the document is, who the parties are, the main values and dates, and any amendment that changes them.
 - keyPoints: 3 to 7 short, concrete points (numbers and dates where relevant), in IMPORTANCE order.
 - document.type: "faktura" (invoice), "umowa" (contract/agreement), "oferta" (offer/quote), "raport" (report), otherwise "inne". If an attachment is a different kind of document, classify by the main document.
-- amounts: monetary amounts explicitly written in the document. "value" is a JSON number with a dot as decimal separator (184 500,00 → 184500). "currency" is the ISO 4217 code of the currency as written (zł → PLN, € → EUR, $ → USD); never convert currencies. "context" briefly says what the amount is, including net/gross (netto/brutto) and period (monthly/yearly) when stated. Skip percentages. Do not repeat the same amount for the same purpose. Order them by IMPORTANCE. If there are very many (e.g. long price lists), keep at most 30, dropping the least important first.
-- dates: only full calendar dates explicitly present in the document, as YYYY-MM-DD, with a short context. Skip dates without a day. At most 30, in IMPORTANCE order.
+- amounts: monetary amounts explicitly written in the document. "value" is a JSON number with a dot as decimal separator (184 500,00 → 184500). "currency" is the ISO 4217 code of the currency as written (zł → PLN, € → EUR, $ → USD); never convert currencies. "context" briefly says what the amount is, including net/gross (netto/brutto) and period (monthly/yearly) when stated. Skip percentages. Do not repeat the same amount for the same purpose. Order them by IMPORTANCE. Keep at most 15, dropping the least important first (e.g. single price-list rows); context at most 8 words.
+- dates: only full calendar dates explicitly present in the document, as YYYY-MM-DD, with a short context. Skip dates without a day. At most 15, in IMPORTANCE order; context at most 8 words.
 - Numeric dates follow the document's locale: in Polish and most European documents 03.04.2026 is 3 April. If a numeric date is ambiguous (day and month both 12 or less) and nothing in the document settles the order, skip it instead of guessing. Never add a year that is not written next to the date.
 - entities.organizations: companies and institutions named in the document. entities.people: full names of people named in the document, as written.
 - Pages marked as scans are attached as images. Read them carefully: they may contain amendments that change other terms. Include their facts.`;
