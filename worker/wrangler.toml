@@ -8,6 +8,9 @@ LLM_PROVIDER = "gemini"
 # Aktualny model Flash z darmowym planem i obsługą obrazów (gemini-2.5-flash nie jest już
 # dostępny dla nowych projektów). Przy niskich limitach darmowych: "gemini-3.5-flash-lite".
 GEMINI_MODEL = "gemini-3.8-flash"
+# Darmowy plan bywa przeciążony („high demand”, HTTP 503). Wtedy Worker próbuje kolejnych
+# modeli; każdy ma osobny limit darmowy. Wszystkie obsługują obrazy (odczyt skanów).
+GEMINI_FALLBACK_MODELS = "gemini-3.5-flash,gemini-3.5-flash-lite,gemini-2.5-flash"
 # Origin GitHub Pages to sama domena, bez ścieżki repozytorium.
 # Localhost NIE jest dopuszczony w produkcji; lokalnie nadpisuje to worker/.dev.vars.
 ALLOWED_ORIGINS = "https://aeternifrigus.github.io"

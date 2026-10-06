@@ -122,7 +122,11 @@ Prompt (pisownia oryginalna): _„check again for any faluts and what is the log
 
 Znaczniki czasu commitów pokazują faktyczny moment zapisu. Pierwsze 11 commitów powstało razem po zbudowaniu pierwszej wersji, więc mają tę samą minutę; nie były sztucznie rozkładane w czasie.
 
+## Po wdrożeniu: przeciążony model
+
+43. **Pierwsza analiza w demo skończyła się komunikatem „Usługa AI jest chwilowo niedostępna”.** Log Workera (`wrangler tail`) pokazał dwa razy HTTP 503 od Gemini: „This model is currently experiencing high demand”. Kod i klucz były poprawne, ale demo zależało od jednego modelu w darmowym planie. Poprawka: `GEMINI_FALLBACK_MODELS` w `wrangler.toml`. Przy 503, innym błędzie serwera, limicie 429 (liczonym osobno dla każdego modelu) lub 404 Worker przełącza się na kolejny model w ramach tego samego wywołania i budżetu czasu; po udanym przełączeniu dalsze wywołania w żądaniu od razu idą do działającego modelu. Błędy klucza (401, 403) i filtrów treści nie przełączają modelu, bo nie zależą od niego. Nazwy modeli zapasowych pochodzą z listy modeli dostępnych dla klucza, a nie z pamięci AI.
+
 ## Weryfikacja
 
-- `npm run lint`, `npm run typecheck`, `npm test` (145 testów), `npm run test:e2e` (20 testów) i `npm run build` przechodzą bez błędów i ostrzeżeń. `npm run check:facts` z plikiem testowym: 27 sprawdzeń odczytu i kontroli wartości na prawdziwym dokumencie.
+- `npm run lint`, `npm run typecheck`, `npm test` (149 testów), `npm run test:e2e` (20 testów) i `npm run build` przechodzą bez błędów i ostrzeżeń. `npm run check:facts` z plikiem testowym: 27 sprawdzeń odczytu i kontroli wartości na prawdziwym dokumencie.
 - Test end-to-end w headless Chromium na pliku testowym i na nietypowych PDF-ach (tabela w README): odczyt 12 stron, strona 11 wyrenderowana do JPEG i wysłana do modelu, ostrzeżenie o instrukcji ze strony 4, brak poziomego przewijania przy 360 px, pobranie pliku `.json`, historia po przeładowaniu, komunikat błędu dla pliku, który nie jest PDF-em.

@@ -167,14 +167,15 @@ Pozostałe polecenia: `npm run lint`, `npm run typecheck`, `npm test`, `npm run 
 
 ### Zmienne środowiskowe
 
-| Zmienna                    | Gdzie                                               | Opis                                                                          |
-| -------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `VITE_API_URL`             | frontend (`.env.local`, w CI: zmienna repozytorium) | adres Workera, bez końcowego `/`                                              |
-| `VITE_BASE_PATH`           | frontend (ustawiane w CI)                           | ścieżka GitHub Pages, domyślnie `/pdf-insight/`                               |
-| `GEMINI_API_KEY`           | Worker, sekret                                      | klucz Google AI Studio                                                        |
-| `GEMINI_MODEL`             | Worker, `wrangler.toml`                             | domyślnie `gemini-3.8-flash` (przy niskich limitach: `gemini-3.5-flash-lite`) |
-| `ALLOWED_ORIGINS`          | Worker, `wrangler.toml` (lokalnie `.dev.vars`)      | dozwolone originy, oddzielone przecinkami; w produkcji bez localhost          |
-| `LLM_PROVIDER`, `OPENAI_*` | Worker                                              | opcjonalnie dowolne API zgodne z OpenAI (np. Groq) zamiast Gemini             |
+| Zmienna                    | Gdzie                                               | Opis                                                                                                |
+| -------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `VITE_API_URL`             | frontend (`.env.local`, w CI: zmienna repozytorium) | adres Workera, bez końcowego `/`                                                                    |
+| `VITE_BASE_PATH`           | frontend (ustawiane w CI)                           | ścieżka GitHub Pages, domyślnie `/pdf-insight/`                                                     |
+| `GEMINI_API_KEY`           | Worker, sekret                                      | klucz Google AI Studio                                                                              |
+| `GEMINI_MODEL`             | Worker, `wrangler.toml`                             | domyślnie `gemini-3.8-flash` (przy niskich limitach: `gemini-3.5-flash-lite`)                       |
+| `GEMINI_FALLBACK_MODELS`   | Worker, `wrangler.toml`                             | modele zapasowe po przecinku, używane przy przeciążeniu (503), limicie (429) lub braku modelu (404) |
+| `ALLOWED_ORIGINS`          | Worker, `wrangler.toml` (lokalnie `.dev.vars`)      | dozwolone originy, oddzielone przecinkami; w produkcji bez localhost                                |
+| `LLM_PROVIDER`, `OPENAI_*` | Worker                                              | opcjonalnie dowolne API zgodne z OpenAI (np. Groq) zamiast Gemini                                   |
 
 ## Wdrożenie
 
@@ -182,7 +183,7 @@ Pozostałe polecenia: `npm run lint`, `npm run typecheck`, `npm test`, `npm run 
 2. **Frontend:** w repozytorium GitHub ustaw _Settings → Pages → Source: GitHub Actions_ oraz zmienną _Settings → Secrets and variables → Actions → Variables → `VITE_API_URL`_. Każdy push do `main` uruchamia `lint → build → deploy`.
 3. Opcjonalnie: sekrety `CLOUDFLARE_API_TOKEN` i `CLOUDFLARE_ACCOUNT_ID` włączają automatyczny deploy Workera (`.github/workflows/worker.yml`).
 4. **Jeśli wdrożenie Workera odrzuci blok `[[ratelimits]]`** (binding niedostępny na koncie), usuń oba bloki z `wrangler.toml`: limit żądań w pamięci Workera nadal działa.
-5. **Model:** `gemini-2.5-flash` nie jest już dostępny dla nowych projektów, dlatego domyślny jest `gemini-3.8-flash`. Limity darmowego planu sprawdzisz w Google AI Studio (Rate limits); przy ich wyczerpaniu ustaw `GEMINI_MODEL = "gemini-3.5-flash-lite"`.
+5. **Model:** `gemini-2.5-flash` nie jest już dostępny dla nowych projektów, dlatego domyślny jest `gemini-3.8-flash`. Limity darmowego planu sprawdzisz w Google AI Studio (Rate limits); przy przeciążeniu („This model is currently experiencing high demand”, HTTP 503) lub wyczerpaniu limitu Worker sam próbuje modeli z `GEMINI_FALLBACK_MODELS`, a w wyniku (`analysis.model`) zapisuje model, który odpowiedział. Listę modeli dostępnych dla klucza pokaże `curl -s "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200" -H "x-goog-api-key: $GEMINI_KEY" | grep '"name"'`.
 6. **Sprawdzenie wyniku prawdziwego modelu:** w demo wgraj plik testowy, pobierz JSON i uruchom sprawdzarkę faktów (sekcja „Kontrola jakości wyników AI”).
 
 ## Testy

@@ -3,6 +3,8 @@ export interface Env {
   LLM_PROVIDER?: string;
   GEMINI_API_KEY?: string;
   GEMINI_MODEL?: string;
+  /** Modele zapasowe po przecinku, używane przy przeciążeniu lub limicie modelu głównego. */
+  GEMINI_FALLBACK_MODELS?: string;
   OPENAI_API_KEY?: string;
   OPENAI_BASE_URL?: string;
   OPENAI_MODEL?: string;

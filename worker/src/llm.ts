@@ -33,7 +33,11 @@ export function createLlm(env: Env, fetchFn: FetchFn = fetch): LlmClient {
   const provider = (env.LLM_PROVIDER ?? 'gemini').toLowerCase();
   if (provider === 'gemini') {
     if (!env.GEMINI_API_KEY) throw misconfigured('GEMINI_API_KEY');
-    return new GeminiClient(env.GEMINI_API_KEY, env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL, fetchFn);
+    return new GeminiClient(
+      env.GEMINI_API_KEY,
+      geminiModels(env.GEMINI_MODEL, env.GEMINI_FALLBACK_MODELS),
+      fetchFn,
+    );
   }
   if (provider === 'openai') {
     if (!env.OPENAI_API_KEY) throw misconfigured('OPENAI_API_KEY');
@@ -115,21 +119,77 @@ export function thinkingConfigFor(model: string): Record<string, unknown> | null
   return null;
 }
 
+/** Model główny i zapasowe (lista po przecinku), bez duplikatów. */
+export function geminiModels(primary?: string, fallbacks?: string): string[] {
+  const list = [primary || DEFAULT_GEMINI_MODEL, ...(fallbacks ?? '').split(',')]
+    .map((m) => m.trim())
+    .filter(Boolean);
+  return [...new Set(list)];
+}
+
+/**
+ * Błędy, przy których warto spróbować innego modelu: przeciążenie (503 „high demand”),
+ * inne błędy serwera, brak odpowiedzi oraz wyczerpany limit (w darmowym planie liczony
+ * osobno dla każdego modelu), a także 404, gdy model nie jest dostępny dla danego klucza.
+ * Błędy klucza (401, 403), żądania (400) i filtrów treści (422) nie zależą od modelu.
+ */
+export function isModelSpecificFailure(e: unknown): boolean {
+  return e instanceof ProviderError && (e.status === 404 || e.status === 429 || e.status >= 500);
+}
+
+/** Bez wystarczającego czasu nie ma sensu pytać kolejnego modelu. */
+const MIN_FALLBACK_MS = 5_000;
+
 class GeminiClient implements LlmClient {
+  private current = 0;
+
   constructor(
     private readonly apiKey: string,
-    readonly model: string,
+    private readonly models: string[],
     private readonly fetchFn: FetchFn,
   ) {}
 
+  /** Model, który ostatnio odpowiedział (trafia do analysis.model w wyniku). */
+  get model(): string {
+    return this.models[this.current] ?? DEFAULT_GEMINI_MODEL;
+  }
+
+  /**
+   * Próbuje modeli po kolei. Po udanym przełączeniu kolejne wywołania w tym samym żądaniu
+   * (ponowna próba, części długiego dokumentu) od razu używają działającego modelu.
+   */
   async complete(system: string, turns: Turn[], options: CallOptions = {}): Promise<string> {
+    const deadline = Date.now() + Math.min(options.timeoutMs ?? CALL_TIMEOUT_MS, CALL_TIMEOUT_MS);
+    for (;;) {
+      try {
+        return await this.completeWith(this.model, system, turns, {
+          ...options,
+          timeoutMs: Math.max(1, deadline - Date.now()),
+        });
+      } catch (e) {
+        const hasNext = this.current + 1 < this.models.length;
+        if (!hasNext || !isModelSpecificFailure(e) || deadline - Date.now() < MIN_FALLBACK_MS) {
+          throw e;
+        }
+        console.warn('Gemini fallback', this.model, '->', this.models[this.current + 1]);
+        this.current++;
+      }
+    }
+  }
+
+  private async completeWith(
+    model: string,
+    system: string,
+    turns: Turn[],
+    options: CallOptions,
+  ): Promise<string> {
     const generationConfig: Record<string, unknown> = {
       responseMimeType: 'application/json',
       temperature: 0.1,
       // Limit obejmuje też tokeny „myślenia” modelu, więc ma zapas ponad samą odpowiedź JSON.
       maxOutputTokens: options.maxOutputTokens ?? 12_288,
     };
-    const thinkingConfig = thinkingConfigFor(this.model);
+    const thinkingConfig = thinkingConfigFor(model);
     if (thinkingConfig) generationConfig.thinkingConfig = thinkingConfig;
 
     const body = {
@@ -146,7 +206,7 @@ class GeminiClient implements LlmClient {
       generationConfig,
     };
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:generateContent`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     const data = (await postJson(
       this.fetchFn,
       url,

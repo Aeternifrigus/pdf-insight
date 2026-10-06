@@ -14,6 +14,7 @@ import { handle } from './router';
 import {
   createLlm,
   DEFAULT_GEMINI_MODEL,
+  geminiModels,
   parseRetryAfter,
   thinkingConfigFor,
   type LlmClient,
@@ -289,6 +290,64 @@ describe('konfiguracja modelu Gemini', () => {
     expect(thinkingConfigFor('gemini-2.5-flash')).toEqual({ thinkingBudget: 0 });
     expect(thinkingConfigFor('gemini-3.5-flash-lite')).toEqual({ thinkingLevel: 'low' });
     expect(thinkingConfigFor('llama-4')).toBeNull();
+  });
+});
+
+describe('modele zapasowe Gemini', () => {
+  const ok = () =>
+    new Response(
+      JSON.stringify({
+        candidates: [{ finishReason: 'STOP', content: { parts: [{ text: good }] } }],
+      }),
+      { status: 200 },
+    );
+  const overloaded = () =>
+    new Response(JSON.stringify({ error: { code: 503, message: 'high demand' } }), {
+      status: 503,
+    });
+
+  it('składa listę modeli bez pustych pozycji i duplikatów', () => {
+    expect(geminiModels(undefined, undefined)).toEqual([DEFAULT_GEMINI_MODEL]);
+    expect(geminiModels('a', ' b, ,a,c ')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('przy przeciążeniu (503) przełącza na model zapasowy i podaje go w wyniku', async () => {
+    const urls: string[] = [];
+    const fetchFn = ((u: string) => {
+      urls.push(u);
+      return Promise.resolve(u.includes('/models/main:') ? overloaded() : ok());
+    }) as typeof fetch;
+    const llm = createLlm(
+      { GEMINI_API_KEY: 'k', GEMINI_MODEL: 'main', GEMINI_FALLBACK_MODELS: 'spare' },
+      fetchFn,
+    );
+    const result = await analyzeDocument(request, llm);
+    expect(urls.map((u) => /models\/([^:]+):/.exec(u)?.[1])).toEqual(['main', 'spare']);
+    expect(result.analysis.model).toBe('spare');
+  });
+
+  it('nie zmienia modelu przy złym kluczu (403)', async () => {
+    const urls: string[] = [];
+    const fetchFn = ((u: string) => {
+      urls.push(u);
+      return Promise.resolve(new Response('forbidden', { status: 403 }));
+    }) as typeof fetch;
+    const llm = createLlm(
+      { GEMINI_API_KEY: 'k', GEMINI_MODEL: 'main', GEMINI_FALLBACK_MODELS: 'spare' },
+      fetchFn,
+    );
+    const err = await analyzeDocument(request, llm).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: 'MISCONFIGURED' });
+    expect(urls.every((u) => u.includes('/models/main:'))).toBe(true);
+  });
+
+  it('gdy wszystkie modele są przeciążone, zgłasza chwilową niedostępność', async () => {
+    const llm = createLlm(
+      { GEMINI_API_KEY: 'k', GEMINI_MODEL: 'main', GEMINI_FALLBACK_MODELS: 'spare' },
+      () => Promise.resolve(overloaded()),
+    );
+    const err = await analyzeDocument(request, llm).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: 'AI_UNAVAILABLE' });
   });
 });
 
