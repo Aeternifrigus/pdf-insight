@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import { reconcileLists } from '../../src/lib/reconcile';
 import { chunkPages, type Chunk } from '../../src/lib/chunk';
 import { mergeLists } from '../../src/lib/merge';
 import {
@@ -435,13 +436,16 @@ export async function analyzeDocument(
   // Kontrole deterministyczne (heurystyka poleceń dla AI, sprawdzanie kwot i dat w tekście)
   // działają w przeglądarce (src/lib/verify.ts): mają tam tekst i nie zużywają limitu CPU
   // Workera (plan darmowy: ok. 10 ms na żądanie). Backend robi tylko to, co wymaga klucza API.
+  // Daty i kwoty z podsumowania i punktów, których brakuje w listach, dopisuje kod (spójność).
+  const reconciled = reconcileLists(core, lists);
+
   const insight: Insight = {
     document: { fileName: req.fileName, pages: req.pageCount, ...core.document },
     summary: core.summary,
     keyPoints: core.keyPoints,
     entities: lists.entities,
-    amounts: lists.amounts,
-    dates: lists.dates,
+    amounts: reconciled.amounts,
+    dates: reconciled.dates,
     keywords: lists.keywords,
     analysis: {
       model: llm.model,

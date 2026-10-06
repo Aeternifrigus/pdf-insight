@@ -163,7 +163,9 @@ Znaczniki czasu commitów pokazują faktyczny moment zapisu. Pierwsze 11 commit�
 
 54. **Zmiana modelu głównego na podstawie danych.** Wyniki na żywo pokazały, że `gemini-3.8-flash` był często przeciążony: 5 z 11 faktur i pomiar czasu umowy obsłużył model zapasowy `gemini-3.5-flash`, który na umowie dał 28/28 faktów obowiązkowych w 9,6 s. Kolejność odwrócona: 3.5-flash główny, 3.8-flash zapasowy. Skrypt pomiaru robi teraz 3 przebiegi na profil i podaje medianę zamiast pojedynczego pomiaru.
 
+55. **Spójność list z podsumowaniem.** Pomiar po zmianie modelu: 27/28 faktów obowiązkowych, bo model wymienił w punktach nową stawkę „od 1 kwietnia 2027 r.”, ale pominął tę datę na liście dat. Zamiast dopisywać kolejne zdanie do promptu (bez gwarancji) dodane uzgadnianie w kodzie: daty i kwoty z podsumowania i punktów, których brakuje na listach, są dopisywane z fragmentem zdania jako kontekstem i podlegają tej samej kontroli z dokumentem. Sprawdzone na zapisanym wyniku, który dał 27/28: po uzgodnieniu 28/28 obowiązkowych i 10/17 uzupełniających. Testy jednostkowe na brak duplikatów i zachowanie kolejności.
+
 ## Weryfikacja
 
-- `npm run lint`, `npm run typecheck`, `npm test` (187 testów), `npm run test:e2e` (21 testów) i `npm run build` przechodzą bez błędów i ostrzeżeń. `npm run check:facts` z plikiem testowym: 27 sprawdzeń odczytu i kontroli wartości na prawdziwym dokumencie.
+- `npm run lint`, `npm run typecheck`, `npm test` (189 testów), `npm run test:e2e` (21 testów) i `npm run build` przechodzą bez błędów i ostrzeżeń. `npm run check:facts` z plikiem testowym: 27 sprawdzeń odczytu i kontroli wartości na prawdziwym dokumencie.
 - Test end-to-end w headless Chromium na pliku testowym i na nietypowych PDF-ach (tabela w README): odczyt 12 stron, strona 11 wyrenderowana do JPEG i wysłana do modelu, ostrzeżenie o instrukcji ze strony 4, brak poziomego przewijania przy 360 px, pobranie pliku `.json`, historia po przeładowaniu, komunikat błędu dla pliku, który nie jest PDF-em.

@@ -30,6 +30,7 @@
     "../src/lib/localeNumbers.ts",
     "../src/lib/verify.ts",
     "../src/lib/ocrCoverage.ts",
+    "../src/lib/reconcile.ts",
     "../src/lib/fixtures.ts"
   ],
   "exclude": ["../src/lib/**/*.test.ts"]
