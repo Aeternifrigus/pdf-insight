@@ -69,6 +69,43 @@ test('skan z dodanym nagłówkiem tekstowym jest wysyłany jako obraz', async ({
   expect(requests[0]?.images.map((i) => i.page)).toEqual([1]);
 });
 
+test('OCR skanu w przeglądarce potwierdza wartość ze skanu i oznacza zmyśloną', async ({
+  page,
+}) => {
+  const base = sampleInsight();
+  await mockApi(page, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({
+        ...base,
+        entities: { organizations: [], people: [] },
+        amounts: [
+          { value: 12345.67, currency: 'PLN', context: 'razem do zapłaty brutto' },
+          { value: 99999, currency: 'PLN', context: 'kwota spoza dokumentu' },
+        ],
+        dates: [{ date: '2026-10-19', context: 'termin płatności' }],
+        analysis: { ...base.analysis, ocrPages: [1] },
+      }),
+    }),
+  );
+  await page.goto('./');
+  await upload(page, 'scan-with-header.pdf');
+  await expect(page.getByRole('heading', { name: 'Podsumowanie' })).toBeVisible({
+    timeout: 20_000,
+  });
+  const json = JSON.parse(await page.locator('pre.json-code').innerText()) as {
+    amounts: { value: number; foundInText: boolean | null }[];
+    dates: { foundInText: boolean | null }[];
+    analysis: { ocrVerifiedPages?: number[] };
+  };
+  expect(json.analysis.ocrVerifiedPages).toEqual([1]);
+  expect(json.amounts.map((a) => a.foundInText)).toEqual([true, false]);
+  expect(json.dates[0]?.foundInText).toBe(true);
+  await expect(page.getByText(/99999 PLN/).first()).toBeVisible();
+});
+
 test('skan w JPEG 2000 jest dekodowany (nie biała strona)', async ({ page }) => {
   const requests = await mockApi(page);
   await page.goto('./');

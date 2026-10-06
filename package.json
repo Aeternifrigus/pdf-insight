@@ -6,10 +6,10 @@
   "description": "PDF Insight: podsumowanie i ekstrakcja danych strukturalnych z plików PDF",
   "author": "Aeternifrigus",
   "scripts": {
-    "predev": "node scripts/copy-pdfjs-assets.mjs",
+    "predev": "node scripts/copy-pdfjs-assets.mjs && node scripts/copy-ocr-assets.mjs",
     "dev": "vite",
     "dev:worker": "wrangler dev --config worker/wrangler.toml",
-    "prebuild": "node scripts/copy-pdfjs-assets.mjs",
+    "prebuild": "node scripts/copy-pdfjs-assets.mjs && node scripts/copy-ocr-assets.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
@@ -25,9 +25,11 @@
   "dependencies": {
     "@fontsource/jetbrains-mono": "5.3.0",
     "@fontsource/schibsted-grotesk": "5.3.0",
+    "@tesseract.js-data/pol": "1.0.0",
     "pdfjs-dist": "6.4.299",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "tesseract.js": "7.0.0",
     "zod": "4.6.5"
   },
   "devDependencies": {

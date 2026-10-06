@@ -34,6 +34,8 @@ import { verifyInsight } from './lib/verify';
 import type { Insight, OutputLanguage } from './lib/schema';
 
 const AUTHOR_URL = 'https://aeternifrigus.netlify.app/';
+/** Ile najwyżej czekać na OCR skanów po odpowiedzi AI (limit 30 s z briefu). */
+const OCR_GRACE_MS = 3_000;
 
 /** Błąd jako dane: tekst powstaje przy wyświetlaniu, w bieżącym języku interfejsu. */
 type ErrorInfo = { error: unknown } | { code: 'NO_TEXT' };
@@ -152,9 +154,24 @@ export default function App() {
       }
 
       setPhase({ kind: 'analyzing', fileName: file.name, startedAt });
+      // OCR skanów (niezależny od AI odczyt do kontroli wartości) biegnie równolegle z analizą.
+      const ocrPromise =
+        pdf.images.length > 0
+          ? import('./lib/ocr').then((m) => m.ocrScans(pdf.images, ctrl.signal)).catch(() => [])
+          : Promise.resolve([]);
       const raw = await analyze(buildRequest(file.name, pdf), ctrl.signal);
+      // Zwykle OCR kończy się przed odpowiedzią AI; jeśli nie, czekamy chwilę, a potem wynik
+      // jest pokazywany bez tej kontroli (wartości ze skanów zostają oznaczone jako niesprawdzone).
+      const ocr = await Promise.race([
+        ocrPromise,
+        new Promise<[]>((resolve) =>
+          setTimeout(() => {
+            resolve([]);
+          }, OCR_GRACE_MS),
+        ),
+      ]);
       // Kontrole deterministyczne na tekście, który przeglądarka już ma (bez kosztu CPU Workera).
-      const insight = verifyInsight(raw, pdf);
+      const insight = verifyInsight(raw, pdf, ocr);
       if (cancelled()) return;
 
       const next = addToHistory(insight, undefined, fileHash);

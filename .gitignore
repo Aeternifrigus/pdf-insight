@@ -9,6 +9,7 @@ worker/.wrangler
 coverage
 .DS_Store
 public/pdfjs
+public/ocr
 test-results
 playwright-report
 e2e/.cache

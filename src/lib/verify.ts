@@ -1,7 +1,15 @@
-import { buildEvidence, checkAmount, checkDate, moneyMentions, type Evidence } from './grounding';
+import {
+  buildEvidence,
+  checkAmount,
+  checkDate,
+  foldForSearch,
+  moneyMentions,
+  type Evidence,
+} from './grounding';
 import { detectInjection, injectionWarnings } from './injection';
 import { extractDates } from './localeNumbers';
 import { dedupeStrings } from './merge';
+import { ocrCovers, type OcrPage } from './ocrCoverage';
 import { insightSchema, type AnalyzeRequest, type Insight } from './schema';
 
 /**
@@ -141,31 +149,92 @@ export function groundTexts(texts: string[], evidence: Evidence, scans: boolean)
 }
 
 /** Uzupełnia wynik z backendu o wyniki kontroli. Wywoływane raz, zaraz po analizie. */
+/** Formy prawne i spójniki pomijane przy szukaniu nazw (nie odróżniają firm). */
+const NAME_STOPWORDS = new Set([
+  'spolka',
+  'akcyjna',
+  'ograniczona',
+  'odpowiedzialnoscia',
+  'komandytowa',
+  'jawna',
+  'ltd',
+  'gmbh',
+  'inc',
+  'llc',
+  'oraz',
+  'and',
+]);
+
+function commonPrefix(a: string, b: string): number {
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  return i;
+}
+
+/**
+ * Czy nazwa (osoba, firma) występuje w tekście. Polskie nazwy się odmieniają: model podaje
+ * „Anna Kowalczyk”, a w umowie jest „Anny Kowalczyk”. Każde słowo nazwy (od 3 liter) musi
+ * mieć w tekście słowo o tym samym początku, różniące się co najwyżej końcówką (do 3 liter).
+ * Kontrola jest celowo łagodna: ma wychwycić nazwisko lub firmę wymyśloną w całości,
+ * a nie zgłaszać fałszywych alarmów przy odmianie.
+ */
+export function nameInText(name: string, docWords: Set<string>): boolean {
+  const words = foldForSearch(name)
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length >= 3 && !NAME_STOPWORDS.has(w));
+  return words.every((w) => {
+    if (docWords.has(w)) return true;
+    for (const d of docWords) {
+      const shared = commonPrefix(w, d);
+      if (shared >= 3 && shared >= Math.min(w.length, d.length) - 3) return true;
+    }
+    return false;
+  });
+}
+
+export function groundEntities(entities: Insight['entities'], folded: string): string[] {
+  const docWords = new Set(folded.split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3));
+  const missing = [...entities.organizations, ...entities.people].filter(
+    (n) => !nameInText(n, docWords),
+  );
+  return listWarning('Tych nazw nie znaleziono w tekście dokumentu, sprawdź je ręcznie', missing);
+}
+
+/**
+ * @param ocr tekst zeskanowanych stron z niezależnego OCR (src/lib/ocr.ts). Gdy pokrywa
+ *   wszystkie skany, wartości ze skanów są sprawdzane tak samo jak z warstwy tekstowej,
+ *   zamiast dostawać „nie da się sprawdzić”.
+ */
 export function verifyInsight(
   insight: Insight,
   source: Pick<AnalyzeRequest, 'pages' | 'images'>,
+  ocr: OcrPage[] = [],
 ): Insight {
-  const heuristic = injectionWarnings(detectInjection(source.pages));
-  const evidence = buildEvidence(source.pages, insight.document.language);
-  const scans = source.images.length > 0;
+  const pages = [...source.pages, ...ocr];
+  const heuristic = injectionWarnings(detectInjection(pages));
+  const evidence = buildEvidence(pages, insight.document.language);
+  const scans = source.images.length > 0 && !ocrCovers(source.images, ocr);
   const grounded = groundLists(
-    source,
+    { pages, images: scans ? source.images : [] },
     insight.amounts,
     insight.dates,
     insight.document.language,
     evidence,
   );
   const textWarnings = groundTexts([insight.summary, ...insight.keyPoints], evidence, scans);
+  const entityWarnings = scans ? [] : groundEntities(insight.entities, evidence.folded);
   return insightSchema.parse({
     ...insight,
     amounts: grounded.amounts,
     dates: grounded.dates,
     analysis: {
       ...insight.analysis,
+      ...(ocr.length > 0 ? { ocrVerifiedPages: ocr.map((o) => o.page) } : {}),
       warnings: dedupeStrings([
         ...combineWarnings(heuristic, insight.analysis.warnings),
         ...textWarnings,
         ...grounded.warnings,
+        ...entityWarnings,
       ]),
     },
   });

@@ -155,6 +155,8 @@ export const analysisMetaSchema = z.object({
    * bywa mniej kompletny, więc nie jest używany ponownie z historii dla tego samego pliku.
    */
   backup: z.boolean().optional(),
+  /** Zeskanowane strony odczytane dodatkowo przez OCR w przeglądarce do kontroli wartości. */
+  ocrVerifiedPages: z.array(z.number().int().min(1)).optional(),
 });
 
 export const insightSchema = z.object({
