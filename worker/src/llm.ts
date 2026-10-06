@@ -138,7 +138,7 @@ const BLOCK_REASONS = new Set([
  * używały, więc nowy klucz API dostawał błąd. Aktualne modele Flash mają darmowy plan i obsługują
  * obrazy (odczyt skanów). Model można zmienić zmienną GEMINI_MODEL bez zmiany kodu.
  */
-export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
 
 /**
  * Ustawienie „myślenia” modelu, krótsze odpowiedzi = mieszczenie się w 30 s z briefu.
