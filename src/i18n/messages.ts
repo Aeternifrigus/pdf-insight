@@ -148,6 +148,9 @@ export const pl = {
     notInTextTitle: 'Tej wartości nie znaleziono w tekście dokumentu',
     currencyMismatch: 'inna waluta w dokumencie',
     currencyMismatchTitle: 'W dokumencie ta wartość występuje tylko z inną walutą',
+    labelMismatch: 'opis inny niż w dokumencie',
+    labelMismatchTitle:
+      'Kwota jest w dokumencie, ale przy niej stoi inny opis (netto/brutto lub okres) niż w wyniku',
     fromInstruction: 'z podejrzanego polecenia',
     fromInstructionTitle:
       'Ta wartość występuje w dokumencie tylko w tekście wyglądającym na polecenie dla AI. Wynik mógł zostać zmanipulowany.',
@@ -338,6 +341,9 @@ export const en: Messages = {
     notInTextTitle: 'This value was not found in the document text',
     currencyMismatch: 'different currency in document',
     currencyMismatchTitle: 'In the document this value appears only with a different currency',
+    labelMismatch: 'label differs from document',
+    labelMismatchTitle:
+      'The amount is in the document, but the words next to it (net/gross or period) differ from the result',
     fromInstruction: 'from a suspicious instruction',
     fromInstructionTitle:
       'This value appears in the document only inside text that looks like an instruction to an AI. The result may have been manipulated.',

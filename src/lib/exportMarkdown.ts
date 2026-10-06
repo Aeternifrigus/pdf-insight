@@ -27,9 +27,10 @@ function escapeLines(text: string): string {
 
 function issueLabel(
   t: (typeof MESSAGES)[Lang],
-  issue: 'notInText' | 'currencyMismatch' | 'fromInstruction' | undefined,
+  issue: 'notInText' | 'currencyMismatch' | 'fromInstruction' | 'labelMismatch' | undefined,
 ): string {
   if (issue === 'fromInstruction') return t.result.fromInstruction;
+  if (issue === 'labelMismatch') return t.result.labelMismatch;
   if (issue === 'currencyMismatch') return t.result.currencyMismatch;
   return t.result.notInText;
 }
@@ -82,7 +83,10 @@ export function buildSummaryMarkdown(insight: Insight, lang: Lang): string {
   else {
     out.push(`| ${t.result.amount} | ${t.result.concerns} |`, '| ---: | --- |');
     for (const a of insight.amounts) {
-      const flag = a.foundInText === false ? ` (${issueLabel(t, a.issue)})` : '';
+      const flag =
+        a.foundInText === false || a.issue === 'labelMismatch'
+          ? ` (${issueLabel(t, a.issue)})`
+          : '';
       out.push(`| ${formatMoney(a.value, a.currency, locale)} | ${escapeMd(a.context)}${flag} |`);
     }
     out.push('');

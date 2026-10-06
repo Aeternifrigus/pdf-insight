@@ -1,10 +1,13 @@
 import {
+  amountLabels,
   buildEvidence,
   checkAmount,
   checkDate,
+  checkLabels,
   foldForSearch,
   moneyMentions,
   type Evidence,
+  type LabelMismatch,
 } from './grounding';
 import { detectInjection, injectionWarnings } from './injection';
 import { extractDates } from './localeNumbers';
@@ -32,6 +35,47 @@ export function combineWarnings(heuristic: string[], fromModel: string[]): strin
 }
 
 const fmt = (value: number, currency: string) => `${String(value)} ${currency}`;
+
+const LABEL_PL: Record<string, string> = {
+  net: 'netto',
+  gross: 'brutto',
+  monthly: 'miesięcznie',
+  yearly: 'rocznie',
+};
+
+/** „(w wyniku: brutto, w dokumencie: netto)” */
+function describeMismatches(list: LabelMismatch[]): string {
+  return list
+    .map(
+      (m) =>
+        `(w wyniku: ${LABEL_PL[m.model] ?? m.model}, w dokumencie: ${m.document
+          .map((d) => LABEL_PL[d] ?? d)
+          .join('/')})`,
+    )
+    .join(' ');
+}
+
+/**
+ * Ta sama kontrola opisów dla kwot zapisanych w podsumowaniu i punktach: słowa przy liczbie
+ * w tekście modelu („226 935 zł netto”) porównane ze słowami przy tej liczbie w dokumencie.
+ */
+export function groundTextLabels(texts: string[], evidence: Evidence): string[] {
+  const out: string[] = [];
+  for (const text of texts) {
+    for (const [value, said] of amountLabels(text, evidence.style)) {
+      for (const kind of ['tax', 'period'] as const) {
+        if (said[kind].size !== 1) continue;
+        const context = [...said[kind]].map((l) => LABEL_PL[l] ?? l).join(' ');
+        const mismatch = checkLabels(value, context, evidence).filter((m) => m.kind === kind);
+        if (mismatch.length > 0) out.push(`${String(value)} ${describeMismatches(mismatch)}`);
+      }
+    }
+  }
+  return listWarning(
+    'Podsumowanie opisuje kwotę inaczej niż dokument (netto/brutto lub okres)',
+    dedupeStrings(out),
+  );
+}
 
 function listWarning(prefix: string, items: string[]): string[] {
   if (items.length === 0) return [];
@@ -65,10 +109,16 @@ export function groundLists(
     delete copy.issue;
     return copy;
   };
+  const mislabeled: string[] = [];
   const checkedAmounts: Insight['amounts'] = amounts.map((a) => {
     const rest = withoutCheck(a);
     const result = checkAmount(a.value, a.currency, evidence);
-    if (result === 'ok') return { ...rest, foundInText: true };
+    if (result === 'ok') {
+      const mismatches = checkLabels(a.value, a.context, evidence);
+      if (mismatches.length === 0) return { ...rest, foundInText: true };
+      mislabeled.push(`${fmt(a.value, a.currency)} ${describeMismatches(mismatches)}`);
+      return { ...rest, foundInText: true, issue: 'labelMismatch' as const };
+    }
     if (result === 'notInText' && scans) return { ...rest, foundInText: null };
     return { ...rest, foundInText: false, issue: result };
   });
@@ -105,6 +155,10 @@ export function groundLists(
         injected,
       ),
       ...listWarning('Waluta niezgodna z dokumentem', mismatched),
+      ...listWarning(
+        'Opis kwoty niezgodny z dokumentem (netto/brutto lub okres), sprawdź go',
+        mislabeled,
+      ),
       ...listWarning(
         'Tych wartości nie znaleziono w tekście dokumentu, sprawdź je ręcznie',
         missing,
@@ -221,7 +275,10 @@ export function verifyInsight(
     insight.document.language,
     evidence,
   );
-  const textWarnings = groundTexts([insight.summary, ...insight.keyPoints], evidence, scans);
+  const textWarnings = [
+    ...groundTexts([insight.summary, ...insight.keyPoints], evidence, scans),
+    ...groundTextLabels([insight.summary, ...insight.keyPoints], evidence),
+  ];
   const entityWarnings = scans ? [] : groundEntities(insight.entities, evidence.folded);
   return insightSchema.parse({
     ...insight,

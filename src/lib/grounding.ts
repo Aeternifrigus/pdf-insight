@@ -211,8 +211,103 @@ export function moneyMentions(text: string, style: DecimalStyle): MoneyMention[]
   return out;
 }
 
+/** Cechy kwoty zapisane w dokumencie tuż przy liczbie albo w opisie modelu. */
+export type TaxLabel = 'net' | 'gross';
+export type PeriodLabel = 'monthly' | 'yearly';
+export interface AmountLabels {
+  tax: Set<TaxLabel>;
+  period: Set<PeriodLabel>;
+}
+
+const TAX_PATTERNS: [TaxLabel, RegExp][] = [
+  ['net', /\bnetto\b|\bnet\b|bez\s+(?:podatku\s+)?vat|excl(?:uding|\.)?\s+vat/iu],
+  ['gross', /\bbrutto\b|\bgross\b|z\s+(?:podatkiem\s+)?vat\b|incl(?:uding|\.)?\s+vat/iu],
+];
+const PERIOD_PATTERNS: [PeriodLabel, RegExp][] = [
+  [
+    'monthly',
+    /miesięczn\p{L}*|\/\s?mies(?:\.|\b)|\bna\s+miesiąc\b|\bza\s+miesiąc\b|\bmonthly\b|\bper\s+month\b|\/\s?month\b/iu,
+  ],
+  [
+    'yearly',
+    /\brocz\p{L}*|\/\s?rok\b|\bza\s+rok\b|\bw\s+roku\b|\bannual\p{L}*|\byearly\b|\bper\s+year\b|\/\s?year\b|\bper\s+annum\b/iu,
+  ],
+];
+
+function labelsIn<T>(text: string, patterns: [T, RegExp][]): T[] {
+  return patterns.filter(([, re]) => re.test(text)).map(([label]) => label);
+}
+
+/** Cechy z opisu kwoty podanego przez model („abonament miesięczny netto”). */
+export function labelsOfContext(context: string): AmountLabels {
+  return {
+    tax: new Set(labelsIn(context, TAX_PATTERNS)),
+    period: new Set(labelsIn(context, PERIOD_PATTERNS)),
+  };
+}
+
+/**
+ * Cechy kwot w dokumencie: słowa tuż po liczbie (do następnej liczby, maks. 40 znaków:
+ * „12 300,00 PLN netto”, „890 USD miesięcznie”), a gdy tam ich nie ma, tuż przed nią
+ * (od poprzedniej liczby, maks. 40 znaków: „abonament miesięczny w wysokości 12 300,00”).
+ * Okno kończy się na sąsiedniej liczbie, żeby „(15 129,00 PLN brutto)” nie przypisało
+ * „brutto” kwocie 12 300,00 stojącej obok.
+ */
+export function amountLabels(text: string, style: DecimalStyle): Map<number, AmountLabels> {
+  const { rest } = extractDates(text);
+  const tokens = parseNumbers(rest, style === 'unknown' ? 'comma' : style).sort(
+    (a, b) => a.index - b.index,
+  );
+  const out = new Map<number, AmountLabels>();
+  tokens.forEach((token, i) => {
+    const end = token.index + token.raw.length;
+    const next = tokens[i + 1]?.index ?? rest.length;
+    const prevToken = tokens[i - 1];
+    const prev = prevToken ? prevToken.index + prevToken.raw.length : 0;
+    const after = rest.slice(end, Math.min(next, end + 40));
+    const before = rest.slice(Math.max(prev, token.index - 40), token.index);
+    const pick = <T>(patterns: [T, RegExp][]) => {
+      const found = labelsIn(after, patterns);
+      return found.length > 0 ? found : labelsIn(before, patterns);
+    };
+    const entry = out.get(token.value) ?? { tax: new Set(), period: new Set() };
+    for (const l of pick(TAX_PATTERNS)) entry.tax.add(l);
+    for (const l of pick(PERIOD_PATTERNS)) entry.period.add(l);
+    out.set(token.value, entry);
+  });
+  return out;
+}
+
+export interface LabelMismatch {
+  kind: 'tax' | 'period';
+  model: string;
+  document: string[];
+}
+
+/**
+ * Czy opis kwoty od modelu przeczy temu, co stoi przy tej liczbie w dokumencie
+ * (np. model: „brutto”, dokument przy tej liczbie: tylko „netto”). Brak informacji
+ * po którejś stronie to brak zarzutu, a nie błąd.
+ */
+export function checkLabels(value: number, context: string, ev: Evidence): LabelMismatch[] {
+  const doc = ev.labels.get(round2(Math.abs(value)));
+  if (!doc) return [];
+  const model = labelsOfContext(context);
+  const out: LabelMismatch[] = [];
+  for (const kind of ['tax', 'period'] as const) {
+    const said = [...model[kind]];
+    const inDoc = [...doc[kind]] as string[];
+    if (said.length !== 1 || inDoc.length === 0) continue;
+    const [label] = said as [string];
+    if (!inDoc.includes(label)) out.push({ kind, model: label, document: inDoc });
+  }
+  return out;
+}
+
 export interface Evidence {
   style: DecimalStyle;
+  /** Cechy kwot (netto/brutto, miesięcznie/rocznie) zapisane przy liczbach w dokumencie. */
+  labels: Map<number, AmountLabels>;
   /** Wszystkie liczby z tekstu poza podejrzanymi poleceniami. */
   numbers: Set<number>;
   /** Wartość → waluty, z którymi występuje w tekście (poza podejrzanymi poleceniami). */
@@ -246,7 +341,14 @@ export function buildEvidence(pages: { text: string }[], languageHint?: string |
     [...numbersInText(injected, style)].filter((n) => !numbers.has(n)),
   );
   const injectedDates = new Set(extractDates(injected).dates.filter((d) => !dateInText(d, folded)));
-  return { style, numbers, money, folded, injectedMoney, injectedNumbers, injectedDates };
+  const labels = amountLabels(clean, style);
+  for (const [value, l] of amountLabels(joined, style)) {
+    const entry = labels.get(value) ?? { tax: new Set(), period: new Set() };
+    for (const x of l.tax) entry.tax.add(x);
+    for (const x of l.period) entry.period.add(x);
+    labels.set(value, entry);
+  }
+  return { style, labels, numbers, money, folded, injectedMoney, injectedNumbers, injectedDates };
 }
 
 export type AmountCheck = 'ok' | 'notInText' | 'currencyMismatch' | 'fromInstruction';

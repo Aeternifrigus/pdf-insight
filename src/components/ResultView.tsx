@@ -58,14 +58,16 @@ const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 /** Oznaczenie wyniku kontroli wartości w tekście dokumentu (bez AI). */
 function CheckBadge({ foundInText, issue }: { foundInText?: boolean | null; issue?: Issue }) {
   const { t, lang } = useI18n();
-  if (foundInText !== false) return null;
+  if (foundInText !== false && issue !== 'labelMismatch') return null;
   const kind = issue ?? 'notInText';
   const [label, title] =
     kind === 'fromInstruction'
       ? [t.result.fromInstruction, t.result.fromInstructionTitle]
       : kind === 'currencyMismatch'
         ? [t.result.currencyMismatch, t.result.currencyMismatchTitle]
-        : [t.result.notInText, t.result.notInTextTitle];
+        : kind === 'labelMismatch'
+          ? [t.result.labelMismatch, t.result.labelMismatchTitle]
+          : [t.result.notInText, t.result.notInTextTitle];
   return (
     <span
       className={`not-in-text${kind === 'fromInstruction' ? ' is-severe' : ''}`}

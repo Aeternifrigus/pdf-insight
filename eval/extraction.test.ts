@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it } from 'vitest';
 import { formFieldLines } from '../src/lib/forms';
-import { buildEvidence, checkAmount, checkDate } from '../src/lib/grounding';
+import { buildEvidence, checkAmount, checkDate, checkLabels } from '../src/lib/grounding';
 import { detectInjection } from '../src/lib/injection';
 import { joinTextItems, type TextItemLike } from '../src/lib/textItems';
 import { TEST_CONTRACT } from './facts';
@@ -122,5 +122,36 @@ if (!file) {
       );
       // 13 100 PLN jest tylko na skanie aneksu, więc tekst nie może go potwierdzić.
       expect(flagged).toEqual(['13100 PLN: notInText']);
+    });
+
+    // Kontrola opisów kwot (netto/brutto, okres) na prawdziwym dokumencie.
+    const CORRECT_LABELS: [number, string][] = [
+      [184500, 'wynagrodzenie za wdrożenie netto'],
+      [226935, 'wynagrodzenie za wdrożenie brutto'],
+      [12300, 'abonament miesięczny netto'],
+      [15129, 'abonament miesięczny brutto'],
+      [8600, 'licencje rocznie, 4 instancje'],
+      [2150, 'licencja za jedną instancję rocznie'],
+      [890, 'hosting miesięcznie'],
+      [240, 'stawka netto za roboczogodzinę'],
+      [60000, 'limit prac dodatkowych netto rocznie'],
+      [250000, 'budżet projektu netto'],
+    ];
+    it('poprawne opisy kwot nie dają fałszywych alarmów', () => {
+      const flagged = CORRECT_LABELS.filter(([v, ctx]) => checkLabels(v, ctx, ev).length > 0);
+      expect(flagged).toEqual([]);
+    });
+    it('zamienione netto/brutto i okres są oznaczane', () => {
+      expect(checkLabels(184500, 'wynagrodzenie za wdrożenie brutto', ev)).toMatchObject([
+        { kind: 'tax', model: 'gross', document: ['net'] },
+      ]);
+      expect(checkLabels(226935, 'wynagrodzenie netto', ev)).toMatchObject([
+        { kind: 'tax', model: 'net' },
+      ]);
+      expect(checkLabels(12300, 'abonament roczny netto', ev)).toMatchObject([
+        { kind: 'period', model: 'yearly', document: ['monthly'] },
+      ]);
+      expect(checkLabels(890, 'hosting rocznie', ev)).toMatchObject([{ kind: 'period' }]);
+      expect(checkLabels(8600, 'licencje miesięcznie', ev)).toMatchObject([{ kind: 'period' }]);
     });
   });

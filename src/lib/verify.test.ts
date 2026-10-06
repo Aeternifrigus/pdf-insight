@@ -79,3 +79,70 @@ describe('OCR skanów jako drugie źródło do kontroli wartości', () => {
     expect(out.amounts.map((a) => a.foundInText)).toEqual([null, null]);
   });
 });
+
+describe('opisy kwot: netto/brutto i okres (bez AI)', () => {
+  const source = {
+    pages: [
+      {
+        page: 1,
+        text: 'Wynagrodzenie wynosi 184 500,00 zł netto, tj. 226 935,00 zł brutto. Abonament miesięczny w wysokości 12 300,00 PLN netto (15 129,00 PLN brutto). Licencje: 8 600 EUR rocznie.',
+      },
+    ],
+    images: [],
+  };
+  const base = { ...sampleInsight(), entities: { organizations: [], people: [] } };
+
+  it('poprawne opisy nie są oznaczane', () => {
+    const out = verifyInsight(
+      {
+        ...base,
+        summary:
+          'Umowa na wdrożenie. Wynagrodzenie to 184 500,00 zł netto. Abonament wynosi 12 300,00 PLN miesięcznie.',
+        keyPoints: ['Brutto: 226 935,00 zł brutto', 'Licencje 8 600 EUR rocznie', 'Okres 24 mies.'],
+        amounts: [
+          { value: 184500, currency: 'PLN', context: 'wdrożenie netto' },
+          { value: 15129, currency: 'PLN', context: 'abonament miesięczny brutto' },
+          { value: 8600, currency: 'EUR', context: 'licencje rocznie' },
+        ],
+      },
+      source,
+    );
+    expect(out.amounts.map((a) => a.issue)).toEqual([undefined, undefined, undefined]);
+    expect(out.analysis.warnings.join(' ')).not.toMatch(/netto\/brutto/);
+  });
+
+  it('kwota z zamienionym opisem jest oznaczona, choć występuje w dokumencie', () => {
+    const out = verifyInsight(
+      {
+        ...base,
+        amounts: [
+          { value: 184500, currency: 'PLN', context: 'wynagrodzenie za wdrożenie brutto' },
+          { value: 12300, currency: 'PLN', context: 'abonament roczny' },
+        ],
+      },
+      source,
+    );
+    expect(out.amounts.map((a) => [a.foundInText, a.issue])).toEqual([
+      [true, 'labelMismatch'],
+      [true, 'labelMismatch'],
+    ]);
+    const warning = out.analysis.warnings.find((w) => w.startsWith('Opis kwoty'));
+    expect(warning).toContain('184500 PLN (w wyniku: brutto, w dokumencie: netto)');
+    expect(warning).toContain('12300 PLN (w wyniku: rocznie, w dokumencie: miesięcznie)');
+  });
+
+  it('podsumowanie z błędnym netto/brutto dostaje ostrzeżenie', () => {
+    const out = verifyInsight(
+      {
+        ...base,
+        summary:
+          'Umowa na wdrożenie systemu. Łączne wynagrodzenie to 226 935,00 zł netto. Strony to zamawiający i wykonawca.',
+        amounts: [],
+      },
+      source,
+    );
+    expect(out.analysis.warnings.join(' ')).toContain(
+      'Podsumowanie opisuje kwotę inaczej niż dokument (netto/brutto lub okres): 226935 (w wyniku: netto, w dokumencie: brutto).',
+    );
+  });
+});

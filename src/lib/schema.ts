@@ -93,9 +93,11 @@ export const amountSchema = z.object({
   /**
    * Pole dodatkowe: powód, dla którego `foundInText` jest false. `currencyMismatch`: wartość jest
    * w dokumencie tylko z inną walutą; `fromInstruction`: wartość występuje wyłącznie
-   * w podejrzanym poleceniu dla AI (możliwa manipulacja wynikiem).
+   * w podejrzanym poleceniu dla AI (możliwa manipulacja wynikiem); `labelMismatch`: wartość jest
+   * w dokumencie (foundInText = true), ale opis modelu przeczy temu, co stoi przy niej
+   * (netto/brutto, miesięcznie/rocznie).
    */
-  issue: z.enum(['notInText', 'currencyMismatch', 'fromInstruction']).optional(),
+  issue: z.enum(['notInText', 'currencyMismatch', 'fromInstruction', 'labelMismatch']).optional(),
 });
 
 export const dateEntrySchema = z.object({
