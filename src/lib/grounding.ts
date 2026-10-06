@@ -91,6 +91,49 @@ const EN_MONTHS = [
   'november',
   'december',
 ];
+const FR_MONTHS = [
+  'janvier',
+  'fevrier',
+  'mars',
+  'avril',
+  'mai',
+  'juin',
+  'juillet',
+  'aout',
+  'septembre',
+  'octobre',
+  'novembre',
+  'decembre',
+];
+const NL_MONTHS = [
+  'januari',
+  'februari',
+  'maart',
+  'april',
+  'mei',
+  'juni',
+  'juli',
+  'augustus',
+  'september',
+  'oktober',
+  'november',
+  'december',
+];
+/** Skróty angielskie („Jan 1, 2022”, „1 Sept 2022”). */
+const EN_SHORT = [
+  ['jan'],
+  ['feb'],
+  ['mar'],
+  ['apr'],
+  ['may'],
+  ['jun'],
+  ['jul'],
+  ['aug'],
+  ['sep', 'sept'],
+  ['oct'],
+  ['nov'],
+  ['dec'],
+];
 const DE_MONTHS = [
   'januar',
   'februar',
@@ -106,7 +149,10 @@ const DE_MONTHS = [
   'dezember',
 ];
 
-/** Tekst bez znaków diakrytycznych, małymi literami, z pojedynczymi spacjami. */
+/**
+ * Tekst bez znaków diakrytycznych, małymi literami, z pojedynczymi spacjami.
+ * Spacja przed przecinkiem jest usuwana: pdf.js składa „August 3 , 2014” z osobnych fragmentów.
+ */
 export function foldForSearch(text: string): string {
   return cleanText(text)
     .normalize('NFD')
@@ -114,7 +160,8 @@ export function foldForSearch(text: string): string {
     .replace(/ł/g, 'l')
     .replace(/Ł/g, 'L')
     .toLowerCase()
-    .replace(/\s+/g, ' ');
+    .replace(/\s+/g, ' ')
+    .replace(/ ,/g, ',');
 }
 
 /** Czy data ISO (YYYY-MM-DD) występuje w tekście w którymś z typowych zapisów. */
@@ -132,17 +179,29 @@ export function dateInText(iso: string, folded: string): boolean {
     `${m}/${d}/${y}`,
     `${mm}/${dd}/${y}`,
     `${d}-${m}-${y}`,
+    `${dd}-${mm}-${y}`,
     `${y}-${m}-${d}`,
     `${y}.${m}.${d}`,
   ];
-  const months = [PL_MONTHS[mi], EN_MONTHS[mi], DE_MONTHS[mi]].filter(Boolean) as string[];
-  const verbal = months.flatMap((name) => [
-    `${dd} ${name} ${y}`,
-    `${d} ${name} ${y}`,
-    `${dd}. ${name} ${y}`,
-    `${name} ${dd}, ${y}`,
-    `${name} ${dd} ${y}`,
-  ]);
+  const months = [
+    PL_MONTHS[mi],
+    EN_MONTHS[mi],
+    DE_MONTHS[mi],
+    FR_MONTHS[mi],
+    NL_MONTHS[mi],
+    ...(EN_SHORT[mi] ?? []).flatMap((m) => [m, `${m}.`]),
+  ].filter(Boolean) as string[];
+  // Liczebniki porządkowe: „1er juillet”, „3rd August”, „August 3rd, 2014”.
+  const ordinal = dd === '1' ? ['1er', '1st'] : dd === '2' ? ['2nd'] : dd === '3' ? ['3rd'] : [];
+  const days = [dd, d, ...ordinal, ...(Number(dd) > 3 ? [`${dd}th`] : [])];
+  const verbal = months.flatMap((name) =>
+    days.flatMap((day) => [
+      `${day} ${name} ${y}`,
+      `${day}. ${name} ${y}`,
+      `${name} ${day}, ${y}`,
+      `${name} ${day} ${y}`,
+    ]),
+  );
   return [...numeric, ...verbal].some((v) => containsStandalone(folded, v));
 }
 
