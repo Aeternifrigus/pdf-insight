@@ -4,17 +4,18 @@
     "pages": 12,
     "language": "pl",
     "type": "umowa",
-    "title": "UMOWA RAMOWA NR 14/2026 o wdrożenie i utrzymanie systemu CRM",
+    "title": "Umowa ramowa nr 14/2026 o wdrożenie i utrzymanie systemu CRM",
     "date": "2026-03-12"
   },
-  "summary": "Umowa ramowa nr 14/2026 zawarta 12 marca 2026 r. pomiędzy Nordwave Logistics sp. z o.o. a Kwadrat Software S.A. dotyczy wdrożenia i utrzymania systemu CRM w modelu SaaS. Wynagrodzenie ryczałtowe za wdrożenie wynosi 184 500,00 PLN netto, a pierwotny miesięczny abonament za utrzymanie wynosił 12 300,00 PLN netto. Aneks nr 1 z dnia 20 marca 2026 r. zwiększył liczbę użytkowników do 135 oraz ustalił, że od 1 kwietnia 2027 r. abonament wzrośnie do 13 100,00 PLN netto. Umowa została zawarta na czas określony od 1 kwietnia 2026 r. do 31 marca 2028 r.",
+  "summary": "Umowa ramowa nr 14/2026 zawarta w dniu 12 marca 2026 r. pomiędzy Nordwave Logistics sp. z o.o. a Kwadrat Software S.A. dotyczy wdrożenia i utrzymania systemu CRM. Wynagrodzenie ryczałtowe za wdrożenie wynosi 184 500,00 zł netto (226 935,00 zł brutto), a początkowy abonament miesięczny za utrzymanie wynosił 12 300,00 zł netto. Aneks nr 1 z dnia 20 marca 2026 r. podwyższył abonament od 1 kwietnia 2027 r. do kwoty 13 100,00 zł netto oraz zwiększył liczbę użytkowników ze 120 do 135. Umowa została zawarta na czas określony od 1 kwietnia 2026 r. do 31 marca 2028 r.",
   "keyPoints": [
-    "Przedmiotem umowy jest wdrożenie systemu CRM dla 135 użytkowników (zwiększone aneksem ze 120) oraz jego późniejsze utrzymanie.",
-    "Wynagrodzenie za wdrożenie wynosi 184 500,00 PLN netto, płatne etapami po odbiorach.",
-    "Abonament za utrzymanie wynosi 12 300,00 PLN netto miesięcznie do 31 marca 2027 r., a od 1 kwietnia 2027 r. wzrasta do 13 100,00 PLN netto miesięcznie na mocy Aneksu nr 1.",
-    "Dodatkowe koszty obejmują licencje roczne w kwocie 8 600 EUR oraz hosting w wysokości 890 USD miesięcznie.",
-    "Umowa obowiązuje od 1 kwietnia 2026 r. do 31 marca 2028 r. z możliwością automatycznego przedłużenia o 12 miesięcy.",
-    "Planowany termin Go-live to 12 października 2026 r."
+    "Przedmiotem umowy jest wdrożenie systemu CRM, migracja danych, integracje oraz szkolenia.",
+    "Wynagrodzenie za wdrożenie wynosi 184 500,00 zł netto (226 935,00 zł brutto).",
+    "Abonament miesięczny wynosi 12 300,00 zł netto do 31 marca 2027 r., a od 1 kwietnia 2027 r. wzrasta do 13 100,00 zł netto (zgodnie z Aneksem nr 1).",
+    "Aneks nr 1 z dnia 20 marca 2026 r. zwiększył liczbę użytkowników systemu ze 120 do 135.",
+    "Umowa obowiązuje na czas określony od 1 kwietnia 2026 r. do 31 marca 2028 r.",
+    "Planowany termin uruchomienia produkcyjnego (Go-live) to 12 października 2026 r.",
+    "Zamawiający zapłaci zaliczkę w wysokości 30% wynagrodzenia za wdrożenie (faktura zaliczkowa na kwotę 68 080,50 zł brutto)."
   ],
   "entities": {
     "organizations": [
@@ -37,7 +38,7 @@
     {
       "value": 184500,
       "currency": "PLN",
-      "context": "wynagrodzenie netto za wdrożenie",
+      "context": "wynagrodzenie ryczałtowe netto za wdrożenie",
       "foundInText": true
     },
     {
@@ -49,44 +50,55 @@
     {
       "value": 12300,
       "currency": "PLN",
-      "context": "abonament miesięczny netto do 31.03.2027",
+      "context": "abonament miesięczny netto do 2027-03-31",
       "foundInText": true
     },
     {
       "value": 13100,
       "currency": "PLN",
-      "context": "abonament miesięczny netto od 01.04.2027",
+      "context": "abonament miesięczny netto od 2027-04-01",
       "foundInText": true
     },
     {
       "value": 8600,
       "currency": "EUR",
-      "context": "roczne opłaty licencyjne",
+      "context": "opłaty licencyjne rocznie za 4 instancje",
       "foundInText": true
     },
     {
       "value": 890,
       "currency": "USD",
-      "context": "miesięczny koszt infrastruktury chmurowej",
-      "foundInText": true
-    },
-    {
-      "value": 55350,
-      "currency": "PLN",
-      "context": "zaliczka netto 30%",
+      "context": "koszt infrastruktury chmurowej miesięcznie",
       "foundInText": true
     },
     {
       "value": 68080.5,
       "currency": "PLN",
-      "context": "zaliczka brutto 30%",
+      "context": "kwota brutto faktury zaliczkowej",
+      "foundInText": true
+    },
+    {
+      "value": 55350,
+      "currency": "PLN",
+      "context": "kwota netto zaliczki 30%",
+      "foundInText": true
+    },
+    {
+      "value": 60000,
+      "currency": "PLN",
+      "context": "maksymalny roczny limit prac dodatkowych netto",
       "foundInText": true
     }
   ],
   "dates": [
     {
+      "date": "2026-02-24",
+      "context": "data spotkania przedumownego",
+      "foundInText": true
+    },
+    {
       "date": "2026-03-12",
-      "context": "data zawarcia umowy",
+      "context": "data zawarcia umowy ramowej",
       "foundInText": true
     },
     {
@@ -96,7 +108,7 @@
     },
     {
       "date": "2026-03-20",
-      "context": "data zawarcia aneksu nr 1",
+      "context": "data zawarcia Aneksu nr 1",
       "foundInText": true
     },
     {
@@ -115,24 +127,35 @@
       "foundInText": true
     },
     {
+      "date": "2027-04-01",
+      "context": "wejście w życie nowej stawki abonamentu",
+      "foundInText": true
+    },
+    {
       "date": "2028-03-31",
-      "context": "koniec obowiązywania umowy",
+      "context": "koniec podstawowego okresu obowiązywania umowy",
+      "foundInText": true
+    },
+    {
+      "date": "2027-03-31",
+      "context": "Abonament miesięczny wynosi 12 300,00 zł netto do 31 marca 2027 r",
       "foundInText": true
     }
   ],
   "keywords": [
     "CRM",
+    "SaaS",
     "wdrożenie",
     "utrzymanie",
-    "SaaS",
     "abonament",
     "aneks",
     "zaliczka",
-    "SLA"
+    "SLA",
+    "migracja"
   ],
   "analysis": {
     "model": "gemini-3.5-flash",
-    "createdAt": "2026-10-06T04:20:22.479Z",
+    "createdAt": "2026-10-06T04:37:26.046Z",
     "chunks": 1,
     "ocrPages": [
       11
