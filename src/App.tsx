@@ -33,6 +33,8 @@ import type { ExtractedPdf } from './lib/pdf';
 import { verifyInsight } from './lib/verify';
 import type { Insight, OutputLanguage } from './lib/schema';
 
+const AUTHOR_URL = 'https://aeternifrigus.netlify.app/';
+
 /** Błąd jako dane: tekst powstaje przy wyświetlaniu, w bieżącym języku interfejsu. */
 type ErrorInfo = { error: unknown } | { code: 'NO_TEXT' };
 
@@ -349,6 +351,17 @@ export default function App() {
 
       <footer className="footer">
         <p>{t.footer}</p>
+        <p className="credit">
+          {t.credit}{' '}
+          <a
+            href={AUTHOR_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Aeternifrigus. ${t.creditLink}`}
+          >
+            Aeternifrigus
+          </a>
+        </p>
       </footer>
     </div>
   );

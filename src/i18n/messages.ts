@@ -219,6 +219,8 @@ export const pl = {
       `Strony ze skanu (tłumaczone z obrazu, bez porównania liczb): ${pages}.`,
     issue: (i: NumericIssue) => `${i.field}: ${plIssue(i)}`,
   },
+  credit: 'Autor:',
+  creditLink: 'Strona autora (otwiera się w nowej karcie)',
   footer:
     'Tekst pliku (oraz obrazy stron bez warstwy tekstowej) jest wysyłany do zewnętrznego dostawcy AI (Google Gemini) w celu analizy i tłumaczenia. Sam plik PDF nie opuszcza przeglądarki. Demo korzysta z darmowego planu API, w którym dostawca może wykorzystywać przesłane treści do ulepszania swoich usług. Nie wgrywaj dokumentów poufnych ani danych osobowych.',
 };
@@ -407,6 +409,8 @@ export const en: Messages = {
       `Scanned pages (translated from the image, numbers not compared): ${pages}.`,
     issue: (i) => `${i.field}: ${enIssue(i)}`,
   },
+  credit: 'Built by',
+  creditLink: "Author's website (opens in a new tab)",
   footer:
     'The file text (and images of pages without a text layer) is sent to an external AI provider (Google Gemini) for analysis and translation. The PDF itself never leaves your browser. This demo uses the free API tier, under which the provider may use submitted content to improve its services. Do not upload confidential documents or personal data.',
 };

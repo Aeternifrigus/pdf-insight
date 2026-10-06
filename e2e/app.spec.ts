@@ -34,6 +34,9 @@ test('stan pusty informuje, że treść trafia do zewnętrznego API AI', async (
   await page.goto('./');
   await expect(page.getByText('Przeciągnij tutaj plik PDF')).toBeVisible();
   await expect(page.getByText(/zewnętrznym API AI/)).toBeVisible();
+  const credit = page.getByRole('link', { name: /Aeternifrigus/ });
+  await expect(credit).toHaveAttribute('href', 'https://aeternifrigus.netlify.app/');
+  await expect(credit).toHaveAttribute('rel', 'noopener noreferrer');
 });
 
 test('PDF z tekstem: wysyła tekst, pokazuje wynik i pozwala pobrać poprawny JSON', async ({

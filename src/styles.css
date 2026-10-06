@@ -924,6 +924,24 @@ mark {
   max-width: 48rem;
 }
 
+.footer .credit {
+  margin-top: 0.75rem;
+  color: var(--ink);
+}
+
+.footer .credit a {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--marker);
+  text-underline-offset: 0.2em;
+}
+
+.footer .credit a:hover {
+  background: var(--marker);
+  color: var(--marker-ink);
+}
+
 @media (max-width: 860px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
