@@ -222,7 +222,7 @@ export const pl = {
   credit: 'Autor:',
   creditLink: 'Strona autora (otwiera się w nowej karcie)',
   footer:
-    'Tekst pliku (oraz obrazy stron bez warstwy tekstowej) jest wysyłany do zewnętrznego dostawcy AI (Google Gemini, a gdy jest niedostępny, Groq) w celu analizy i tłumaczenia. Sam plik PDF nie opuszcza przeglądarki. Demo korzysta z darmowych planów API, w których dostawca może wykorzystywać przesłane treści do ulepszania swoich usług. Nie wgrywaj dokumentów poufnych ani danych osobowych.',
+    'Tekst pliku (oraz obrazy stron bez warstwy tekstowej) jest wysyłany do zewnętrznego dostawcy AI (Google Gemini, a gdy jest niedostępny, Groq lub Cloudflare Workers AI) w celu analizy i tłumaczenia. Sam plik PDF nie opuszcza przeglądarki. Demo korzysta z darmowych planów API, w których dostawca może wykorzystywać przesłane treści do ulepszania swoich usług. Nie wgrywaj dokumentów poufnych ani danych osobowych.',
 };
 
 export type Messages = typeof pl;
@@ -412,7 +412,7 @@ export const en: Messages = {
   credit: 'Built by',
   creditLink: "Author's website (opens in a new tab)",
   footer:
-    'The file text (and images of pages without a text layer) is sent to an external AI provider (Google Gemini, or Groq when Gemini is unavailable) for analysis and translation. The PDF itself never leaves your browser. This demo uses free API tiers, under which the provider may use submitted content to improve its services. Do not upload confidential documents or personal data.',
+    'The file text (and images of pages without a text layer) is sent to an external AI provider (Google Gemini, or Groq or Cloudflare Workers AI when Gemini is unavailable) for analysis and translation. The PDF itself never leaves your browser. This demo uses free API tiers, under which the provider may use submitted content to improve its services. Do not upload confidential documents or personal data.',
 };
 
 export const MESSAGES: Record<Lang, Messages> = { pl, en };
